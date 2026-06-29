@@ -1,0 +1,57 @@
+/* Design tokens — edit here to change colors, radii, typography, and shadows app-wide. */
+:root {
+  /* Backgrounds & surfaces (Mana Market: deep black) */
+  --bg:          #0a0a0a;
+  --surface:     #121212;
+  --surface-2:   #1a1a1a;
+  --surface-3:   #242424;
+
+  /* Borders */
+  --border:      #2e2e2e;
+  --border-sub:  #1a1a1a;
+
+  /* Brand / accent (metallic gold from logo) */
+  --gold:        #c9a227;
+  --gold-hover:  #dbb84a;
+  --gold-dim:    #a88620;
+  --gold-subtle: rgba(201, 162, 39, 0.04);
+  --gold-soft:   rgba(201, 162, 39, 0.08);
+  --gold-medium: rgba(201, 162, 39, 0.1);
+  --gold-strong: rgba(201, 162, 39, 0.12);
+  --on-accent:   #0a0a0a;
+
+  /* Text */
+  --text:        #f0ebe3;
+  --text-muted:  #9a9288;
+  --text-faint:  #6e6860;
+
+  /* Semantic colors */
+  --green:       #3fb950;
+  --green-dim:   #1b4721;
+  --yellow:      #d29922;
+  --yellow-dim:  #4a3000;
+  --red:         #f85149;
+  --red-dim:     #4a1a1a;
+  --red-hover:   #d73a31;
+  --blue:        #58a6ff;
+  --blue-dim:    #1a2f4a;
+  --on-light:    #fff;
+
+  /* Border radius */
+  --radius-xs:   3px;
+  --radius:      6px;
+  --radius-md:   9px;
+  --radius-lg:   10px;
+  --radius-full: 50%;
+
+  /* Shadows */
+  --shadow:      0 4px 16px rgba(0, 0, 0, 0.5);
+  --shadow-sm:   0 1px 4px rgba(0, 0, 0, 0.4);
+
+  /* Typography */
+  --font:        'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-mono:   'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+
+  /* Layout */
+  --content-max-width: 1200px;
+}
