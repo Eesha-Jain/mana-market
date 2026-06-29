@@ -1,3 +1,5 @@
+import { isPersistentImageUrl } from './utils/imageUrl';
+
 // eBay listing conditions (with their eBay condition IDs)
 export type EbayCondition =
   | 'New'
@@ -175,13 +177,16 @@ export function hasCustomTitle(item: ItemListing): boolean {
   return !!item.customTitle?.trim();
 }
 
-/** Primary product image URL, if any. */
+/** Primary product image URL, if any (persistent HTTP/S only). */
 export function getItemImageUrl(item: ItemListing): string | null {
   if (item.preferredImageSource === 'user') {
-    return item.userImageUrl ?? item.photoUrl ?? item.product?.imageUrls[0] ?? null;
+    const userUrl = item.userImageUrl ?? item.photoUrl;
+    if (userUrl && isPersistentImageUrl(userUrl)) return userUrl;
+    return item.product?.imageUrls[0] ?? null;
   }
   if (item.product?.imageUrls[0]) return item.product.imageUrls[0];
-  return item.userImageUrl ?? item.photoUrl ?? null;
+  const fallback = item.userImageUrl ?? item.photoUrl;
+  return fallback && isPersistentImageUrl(fallback) ? fallback : null;
 }
 
 /** All picture URLs for eBay export (selected image first, then catalog alternates). */
@@ -190,7 +195,7 @@ export function getItemPictureUrls(item: ItemListing): string[] {
   const urls: string[] = [];
 
   const push = (url: string | null | undefined) => {
-    if (!url || seen.has(url)) return;
+    if (!url || !isPersistentImageUrl(url) || seen.has(url)) return;
     seen.add(url);
     urls.push(url);
   };

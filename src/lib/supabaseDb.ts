@@ -41,6 +41,13 @@ interface ListingRow {
   created_at: string;
 }
 
+function assertNoError(error: { message?: string } | null, operation: string): void {
+  if (error) {
+    console.error(`[supabase] ${operation}`, error);
+    throw new Error(error.message || `Failed to ${operation}`);
+  }
+}
+
 function rowToListing(row: ListingRow): ItemListing {
   return {
     id: row.id,
@@ -106,6 +113,38 @@ function listingToRow(item: ItemListing, userId: string): ListingRow {
   };
 }
 
+/** Mutable listing fields only — excludes id, user_id, created_at. */
+function listingToUpdatePayload(item: ItemListing) {
+  return {
+    listing_id: item.listingId,
+    query: item.query,
+    status: item.status,
+    original_upc: item.originalUpc ?? null,
+    original_sku: item.originalSku ?? null,
+    product: item.product ?? null,
+    ambiguous_results: item.ambiguousResults ?? null,
+    custom_title: item.customTitle ?? null,
+    custom_description: item.customDescription ?? null,
+    quantity: item.quantity,
+    condition: item.condition,
+    pricing_mode: item.pricingMode,
+    percent_below: item.percentBelow,
+    manual_price: item.manualPrice,
+    market_price_preference: item.marketPricePreference ?? null,
+    selected_market_price_source: item.selectedMarketPriceSource ?? null,
+    notes: item.notes,
+    ebay_exported_at: item.ebayExportedAt ?? null,
+    ebay_listing_status: item.ebayListingStatus ?? null,
+    photo_url: item.photoUrl ?? null,
+    user_image_url: item.userImageUrl ?? null,
+    preferred_image_source: item.preferredImageSource ?? null,
+    detected_product_type: item.detectedProductType ?? null,
+    detected_card_count: item.detectedCardCount ?? null,
+    source: item.source,
+    updated_at: new Date().toISOString(),
+  };
+}
+
 export async function fetchProfile(userId: string): Promise<AppUser | null> {
   const supabase = getSupabase();
   const { data, error } = await supabase
@@ -147,51 +186,30 @@ export async function fetchListings(userId: string): Promise<ItemListing[]> {
 export async function insertListing(item: ItemListing, userId: string): Promise<void> {
   const supabase = getSupabase();
   const { error } = await supabase.from('listings').insert(listingToRow(item, userId));
-  if (error) console.error('[supabase] insertListing', error);
-}
-
-export async function insertListings(items: ItemListing[], userId: string): Promise<void> {
-  if (!items.length) return;
-  const supabase = getSupabase();
-  const { error } = await supabase.from('listings').insert(items.map(item => listingToRow(item, userId)));
-  if (error) console.error('[supabase] insertListings', error);
+  assertNoError(error, 'save listing');
 }
 
 export async function updateListing(item: ItemListing, userId: string): Promise<void> {
   const supabase = getSupabase();
-  const row = listingToRow(item, userId);
   const { error } = await supabase
     .from('listings')
-    .update({
-      ...row,
-      updated_at: new Date().toISOString(),
-    })
+    .update(listingToUpdatePayload(item))
     .eq('id', item.id)
     .eq('user_id', userId);
 
-  if (error) console.error('[supabase] updateListing', error);
-}
-
-export async function patchListing(
-  id: string,
-  userId: string,
-  item: ItemListing,
-  updates: Partial<ItemListing>,
-): Promise<void> {
-  const merged = { ...item, ...updates };
-  await updateListing(merged, userId);
+  assertNoError(error, 'update listing');
 }
 
 export async function deleteListing(id: string, userId: string): Promise<void> {
   const supabase = getSupabase();
   const { error } = await supabase.from('listings').delete().eq('id', id).eq('user_id', userId);
-  if (error) console.error('[supabase] deleteListing', error);
+  assertNoError(error, 'delete listing');
 }
 
 export async function deleteAllListings(userId: string): Promise<void> {
   const supabase = getSupabase();
   const { error } = await supabase.from('listings').delete().eq('user_id', userId);
-  if (error) console.error('[supabase] deleteAllListings', error);
+  assertNoError(error, 'clear listings');
 }
 
 export async function fetchUserSettings(userId: string): Promise<UserSettings | null> {
@@ -204,7 +222,7 @@ export async function fetchUserSettings(userId: string): Promise<UserSettings | 
 
   if (error) {
     console.error('[supabase] fetchUserSettings', error);
-    return null;
+    throw error;
   }
 
   if (!data?.settings) return null;
@@ -219,7 +237,7 @@ export async function saveUserSettings(userId: string, settings: UserSettings): 
     updated_at: new Date().toISOString(),
   });
 
-  if (error) console.error('[supabase] saveUserSettings', error);
+  assertNoError(error, 'save settings');
 }
 
 export async function updateProfileName(userId: string, name: string): Promise<void> {
@@ -229,5 +247,5 @@ export async function updateProfileName(userId: string, name: string): Promise<v
     .update({ name, updated_at: new Date().toISOString() })
     .eq('id', userId);
 
-  if (error) console.error('[supabase] updateProfileName', error);
+  assertNoError(error, 'update profile');
 }

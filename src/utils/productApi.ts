@@ -1,9 +1,10 @@
 import type { Product, MarketPriceSource, PriceRange, ImageCandidate } from '../types';
+import { fetchWithTimeout } from './fetchWithTimeout';
 
 export type BackendSearchResult =
   | { type: 'found';     source: string; product: Product; missingFields?: string[]; imageCandidates?: ImageCandidate[] }
   | { type: 'ambiguous'; source: string; results: Product[]; missingFields?: string[]; imageCandidates?: ImageCandidate[] }
-  | { type: 'not_found'; missingFields?: string[] }
+  | { type: 'not_found'; query?: string; missingFields?: string[] }
   | { type: 'unavailable'; reason: string };
 
 export async function searchProduct(
@@ -17,8 +18,8 @@ export async function searchProduct(
   if (sku)   params.set('sku', sku);
 
   try {
-    const res = await fetch(`/api/search?${params}`, {
-      signal: AbortSignal.timeout(15_000),
+    const res = await fetchWithTimeout(`/api/search?${params}`, {
+      timeoutMs: 15_000,
     });
 
     if (!res.ok) {

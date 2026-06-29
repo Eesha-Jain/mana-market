@@ -106,7 +106,8 @@ export function resolveInitialSelectedSource(
   }
 
   const preferred = findOptionForPreference(options, preference);
-  return (preferred ?? options[0]).source;
+  if (preferred) return preferred.source;
+  return options[0]!.source;
 }
 
 export function shouldShowMarketPricePicker(

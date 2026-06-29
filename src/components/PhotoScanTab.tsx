@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useItems } from '../contexts/ItemsContext';
 import { useUserSettings } from '../contexts/UserSettingsContext';
 import { buildPhotoReviewData } from '../utils/photoReview';
+import { persistPhotoScanImage } from '../utils/imageUpload';
 import { ProductReviewFlow } from './ProductReviewFlow';
 import { PhotoCaptureTargetSelector } from './PhotoCaptureTargetSelector';
 import { SaveDefaultPrompt, type DefaultSaveOffer } from './SaveDefaultPrompt';
@@ -99,6 +100,7 @@ export function PhotoScanTab() {
   const bulkRunIdRef = useRef(0);
   const singleRunIdRef = useRef(0);
   const batchConditionPrefillRef = useRef<EbayCondition | null>(null);
+  const currentPhotoFileRef = useRef<File | null>(null);
   pendingPhotosRef.current = pendingPhotos;
   bulkIndexRef.current = bulkIndex;
   bulkProcessingRef.current = bulkProcessing;
@@ -183,11 +185,24 @@ export function PhotoScanTab() {
     return data;
   };
 
-  const queueItem = (payload: ProductReviewConfirmPayload) => {
+  const queueItem = async (payload: ProductReviewConfirmPayload) => {
+    let photoUrl = payload.photoUrl;
+    let userImageUrl = payload.userImageUrl;
+    let preferredImageSource = payload.preferredImageSource;
+
+    try {
+      const persisted = await persistPhotoScanImage(photoUrl, currentPhotoFileRef.current ?? undefined);
+      if (persisted.photoUrl) photoUrl = persisted.photoUrl;
+      if (persisted.userImageUrl) userImageUrl = persisted.userImageUrl;
+      if (persisted.preferredImageSource) preferredImageSource = persisted.preferredImageSource;
+    } catch {
+      // Local blob kept for in-app preview when upload is unavailable.
+    }
+
     addItem(payload.query, 'photo', {
-      photoUrl: payload.photoUrl,
-      userImageUrl: payload.userImageUrl,
-      preferredImageSource: payload.preferredImageSource,
+      photoUrl,
+      userImageUrl,
+      preferredImageSource,
       quantity: payload.quantity,
       condition: payload.condition,
       pricingMode: payload.pricingMode,
@@ -215,6 +230,7 @@ export function PhotoScanTab() {
 
     const objectUrl = URL.createObjectURL(file);
     setPreviewUrl(objectUrl);
+    currentPhotoFileRef.current = file;
 
     try {
       const data = applyBatchConditionPrefill(
@@ -261,6 +277,7 @@ export function PhotoScanTab() {
     setScanning(true);
 
     const photo = photos[index]!;
+    currentPhotoFileRef.current = photo.file;
     try {
       const data = applyBatchConditionPrefill(
         await buildPhotoReviewData(photo.file, photo.previewUrl, { captureTarget }),
@@ -310,8 +327,8 @@ export function PhotoScanTab() {
     void processBulkPhotoAt(bulkIndexRef.current + 1, activeBulkQueueRef.current);
   };
 
-  const handleConfirmReview = (payload: ProductReviewConfirmPayload) => {
-    queueItem(payload);
+  const handleConfirmReview = async (payload: ProductReviewConfirmPayload) => {
+    await queueItem(payload);
 
     if (bulkProcessingRef.current) {
       setReviewData(null);

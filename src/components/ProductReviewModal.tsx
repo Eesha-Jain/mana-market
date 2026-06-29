@@ -527,7 +527,7 @@ export function ProductReviewModal({
               />
 
               {batchProgress &&
-                batchProgress.remaining > 0 &&
+                (batchProgress.remaining ?? 0) > 0 &&
                 condition &&
                 onApplyConditionToRemaining && (
                   <button

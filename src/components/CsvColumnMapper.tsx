@@ -8,6 +8,7 @@ import {
 interface CsvColumnMapperProps {
   unrecognizedHeaders: string[];
   mappings: Record<string, ColumnMappingChoice>;
+  mappingWarnings?: string[];
   onMappingChange: (header: string, choice: ColumnMappingChoice) => void;
   onConfirm: () => void;
   onCancel: () => void;
@@ -17,6 +18,7 @@ interface CsvColumnMapperProps {
 export function CsvColumnMapper({
   unrecognizedHeaders,
   mappings,
+  mappingWarnings = [],
   onMappingChange,
   onConfirm,
   onCancel,
@@ -33,6 +35,14 @@ export function CsvColumnMapper({
           Map each one to a supported field or discard the data.
         </p>
       </div>
+
+      {mappingWarnings.length > 0 && (
+        <div className="form-error-banner csv-column-mapper-warnings" role="status">
+          {mappingWarnings.map(warning => (
+            <p key={warning} style={{ margin: 0 }}>{warning}</p>
+          ))}
+        </div>
+      )}
 
       <div className="csv-column-mapper-list">
         {unrecognizedHeaders.map(header => (

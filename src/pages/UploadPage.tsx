@@ -6,6 +6,7 @@ import {
   applyColumnMappings,
   parseCSVFileRaw,
   defaultColumnMappings,
+  getDuplicateMappingWarnings,
   type RawParsedTable,
   type ColumnMappingChoice,
 } from '../utils/csvParser';
@@ -489,6 +490,7 @@ export function UploadPage() {
               <CsvColumnMapper
                 unrecognizedHeaders={pendingImport.unrecognizedHeaders}
                 mappings={columnMappings}
+                mappingWarnings={getDuplicateMappingWarnings(pendingImport, columnMappings)}
                 onMappingChange={handleColumnMappingChange}
                 onConfirm={handleConfirmColumnMappings}
                 onCancel={handleCancelColumnMappings}
@@ -592,7 +594,7 @@ export function UploadPage() {
             {csvError && <div className="form-error-banner" style={{ marginTop: '12px' }}>{csvError}</div>}
             {csvConfirmed && !entryReviewActive && (
               <div className="form-success-banner">
-                Items added to queue! Looking up products in the background…
+                Items added to your review queue.
               </div>
             )}
           </div>

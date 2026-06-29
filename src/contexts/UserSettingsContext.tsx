@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, useCallback, type ReactNode } from 'react';
 import { applyTextCase } from '../utils/textCase';
 import {
   DEFAULT_USER_SETTINGS,
@@ -14,13 +14,16 @@ import { fetchUserSettings, saveUserSettings } from '../lib/supabaseDb';
 
 interface UserSettingsContextType {
   settings: UserSettings;
+  syncError: string | null;
+  loadError: string | null;
+  clearSyncError: () => void;
+  clearLoadError: () => void;
   updateSettings: (patch: Partial<UserSettings>) => void;
   isDefaultConfigured: (key: UserSettingKey) => boolean;
   saveConfiguredDefault: (patch: Partial<UserSettings>, keys: UserSettingKey | UserSettingKey[]) => void;
   clearConfiguredDefault: (key: UserSettingKey, patch?: Partial<UserSettings>) => void;
   applyDefaultTitleCase: (text: string) => string;
   applyDefaultDescriptionCase: (text: string) => string;
-  /** Effective photo target — null when user has not set a default. */
   defaultPhotoCaptureTarget: PhotoCaptureTarget | null;
 }
 
@@ -56,26 +59,45 @@ function markKeysConfigured(
   return next;
 }
 
+function formatSyncError(err: unknown, action: string): string {
+  const detail = err instanceof Error ? err.message : String(err);
+  return `Could not ${action}: ${detail}.`;
+}
+
 export function UserSettingsProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_USER_SETTINGS);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const hydratedRef = useRef(false);
+  const dirtyRef = useRef(false);
+
+  const clearSyncError = useCallback(() => setSyncError(null), []);
+  const clearLoadError = useCallback(() => setLoadError(null), []);
 
   useEffect(() => {
     if (!user) {
       hydratedRef.current = false;
+      dirtyRef.current = false;
       setSettings(DEFAULT_USER_SETTINGS);
+      setLoadError(null);
       return;
     }
 
+    dirtyRef.current = false;
+    hydratedRef.current = false;
+    setLoadError(null);
+
     if (isSupabaseConfigured()) {
-      hydratedRef.current = false;
       fetchUserSettings(user.id)
         .then(loaded => {
+          if (dirtyRef.current) return;
           setSettings(loaded ?? DEFAULT_USER_SETTINGS);
           hydratedRef.current = true;
         })
-        .catch(() => {
+        .catch(err => {
+          if (dirtyRef.current) return;
+          setLoadError(formatSyncError(err, 'load your settings'));
           setSettings(DEFAULT_USER_SETTINGS);
           hydratedRef.current = true;
         });
@@ -90,7 +112,9 @@ export function UserSettingsProvider({ children }: { children: ReactNode }) {
     if (!user || !hydratedRef.current) return;
 
     if (isSupabaseConfigured()) {
-      void saveUserSettings(user.id, settings);
+      void saveUserSettings(user.id, settings).catch(err => {
+        setSyncError(formatSyncError(err, 'save settings'));
+      });
       return;
     }
 
@@ -98,10 +122,12 @@ export function UserSettingsProvider({ children }: { children: ReactNode }) {
   }, [settings, user?.id]);
 
   const updateSettings = (patch: Partial<UserSettings>) => {
+    dirtyRef.current = true;
     setSettings(prev => ({ ...prev, ...patch }));
   };
 
   const saveConfiguredDefault = (patch: Partial<UserSettings>, keys: UserSettingKey | UserSettingKey[]) => {
+    dirtyRef.current = true;
     setSettings(prev => ({
       ...prev,
       ...patch,
@@ -110,6 +136,7 @@ export function UserSettingsProvider({ children }: { children: ReactNode }) {
   };
 
   const clearConfiguredDefault = (key: UserSettingKey, patch: Partial<UserSettings> = {}) => {
+    dirtyRef.current = true;
     setSettings(prev => {
       const configuredDefaults = { ...prev.configuredDefaults };
       delete configuredDefaults[key];
@@ -132,6 +159,10 @@ export function UserSettingsProvider({ children }: { children: ReactNode }) {
     <UserSettingsContext.Provider
       value={{
         settings,
+        syncError,
+        loadError,
+        clearSyncError,
+        clearLoadError,
         updateSettings,
         isDefaultConfigured: checkConfigured,
         saveConfiguredDefault,

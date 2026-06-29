@@ -442,6 +442,33 @@ function buildProductFromUpcData(upcData: UpcData, ebayAgg: EbayAgg | null, quer
   return product;
 }
 
+function titlesDiverge(a: string, b: string): boolean {
+  const na = a.toLowerCase().trim();
+  const nb = b.toLowerCase().trim();
+  if (!na || !nb) return false;
+  if (na.includes(nb) || nb.includes(na)) return false;
+
+  const tokensA = na.split(/[\s/\-_,]+/).filter(t => t.length >= 3);
+  const tokensB = new Set(nb.split(/[\s/\-_,]+/).filter(t => t.length >= 3));
+  let overlap = 0;
+  for (const token of tokensA) {
+    if (tokensB.has(token)) overlap++;
+  }
+  return overlap < 2;
+}
+
+function dedupeSearchProducts(products: SearchProduct[]): SearchProduct[] {
+  const seen = new Set<string>();
+  const out: SearchProduct[] = [];
+  for (const product of products) {
+    const key = product.title.toLowerCase().trim();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(product);
+  }
+  return out;
+}
+
 /** Rank/filter listing titles using a secondary hint (SKU or product name). */
 export function narrowProductsByHint(products: SearchProduct[], hint: string | undefined): SearchProduct[] {
   const needle = (hint || '').trim().toLowerCase();
@@ -560,6 +587,27 @@ export async function searchItem(query: string, upc?: string, sku?: string): Pro
       title || skuTerm || upcData.title,
     );
     enrichProductImages(product, upcData, allEbayImages);
+
+    const ebayProducts = bestRun?.products ?? [];
+    if (ebayProducts.length > 1) {
+      const results = dedupeSearchProducts([product, ...ebayProducts]);
+      if (results.length > 1) {
+        return attachSearchMetadata({ type: 'ambiguous', source: 'upc+ebay', results });
+      }
+    }
+
+    if (ebayProducts.length === 1) {
+      const ebayProduct = ebayProducts[0]!;
+      if (titlesDiverge(product.title, ebayProduct.title)) {
+        enrichProductImages(ebayProduct, upcData, allEbayImages);
+        return attachSearchMetadata({
+          type: 'ambiguous',
+          source: 'upc+ebay',
+          results: dedupeSearchProducts([product, ebayProduct]),
+        });
+      }
+    }
+
     return attachSearchMetadata({ type: 'found', source: 'upc_db', product });
   }
 
@@ -598,17 +646,7 @@ export async function searchItem(query: string, upc?: string, sku?: string): Pro
     return { type: 'not_found', missingFields: ['title', 'image'] };
   }
 
-  const product = buildProductFromSources({
-    title: fallbackLabel,
-    description: upcData?.description || '',
-    brand: upcData?.brand,
-    imageUrls: upcData?.imageUrls || [],
-    upc: upc || upcData?.upc || null,
-    marketPrice: null,
-    marketPriceSource: null,
-    query: fallbackLabel,
-  });
-  enrichProductImages(product, upcData, allEbayImages);
-
-  return attachSearchMetadata({ type: 'found', source: 'manual', product });
+  const missingFields = ['image'];
+  if (!upcData?.imageUrls?.length) missingFields.push('market_price');
+  return { type: 'not_found', query: fallbackLabel, missingFields };
 }

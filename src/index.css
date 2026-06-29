@@ -273,6 +273,15 @@ code {
   margin-bottom: 14px;
 }
 
+.sync-error-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 24px 12px;
+  max-width: var(--page-max-width, 1200px);
+}
+
 .form-success-banner {
   background: var(--green-dim);
   border: 1px solid var(--green);

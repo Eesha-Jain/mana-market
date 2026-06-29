@@ -1,5 +1,6 @@
 import type { Product, EbayCondition, PricingMode, ImageCandidate, MarketPricePreference, MarketPriceSource } from '../types';
 import type { EntryReviewDraft } from './entryReview';
+import { entryDraftPricingDefaults } from './entryReview';
 import type { PackParseResult } from './photoScanner';
 import { searchProduct } from './productApi';
 import { resolveSearchParams } from './productLookup';
@@ -212,9 +213,7 @@ export async function buildEntryProductReviewData(
     lookupError,
     initialQuantity: draft.quantity,
     initialCondition: draft.condition,
-    initialPricingMode: draft.pricingMode,
-    initialPercentBelow: draft.percentBelow,
-    initialManualPrice: draft.manualPrice,
+    ...entryDraftPricingDefaults(draft),
     source: draft.source,
   };
 }

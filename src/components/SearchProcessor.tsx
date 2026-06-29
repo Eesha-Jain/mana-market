@@ -1,5 +1,7 @@
 /**
- * Background processor — resolves items via the backend (UPC + eBay).
+ * Background processor — resolves legacy idle items via the backend (UPC + eBay).
+ * Upload and photo flows set status + product during entry review; this handles
+ * any remaining idle rows (e.g. older data or programmatic addItem without overrides).
  */
 import { useEffect, useRef } from 'react';
 import { useItems } from '../contexts/ItemsContext';

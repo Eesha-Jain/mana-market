@@ -45,7 +45,7 @@ const CANONICAL_KEYS = new Set<string>(CSV_COLUMN_KEYS);
 const HEADER_MAP: Record<string, CSVColumnKey> = {
   name: 'name', 'card name': 'name', card_name: 'name', cardname: 'name',
   title: 'name', item: 'name', product: 'name',
-  sku: 'sku', id: 'sku', product_id: 'sku', scryfall_id: 'sku',
+  sku: 'sku', product_id: 'sku', scryfall_id: 'sku',
   upc: 'upc', barcode: 'upc',
   'set code': 'set', set_code: 'set', set: 'set',
   'collector number': 'collector_number', collector_number: 'collector_number',
@@ -53,7 +53,7 @@ const HEADER_MAP: Record<string, CSVColumnKey> = {
   quantity: 'quantity', qty: 'quantity', count: 'quantity', copies: 'quantity', amount: 'quantity',
   condition: 'condition', cond: 'condition', grade: 'condition', quality: 'condition',
   notes: 'notes', note: 'notes', comments: 'notes', comment: 'notes', description: 'notes',
-  price: 'price', asking_price: 'price', list_price: 'price', sale_price: 'price', cost: 'price',
+  price: 'price', asking_price: 'price', list_price: 'price', sale_price: 'price',
 };
 
 function resolveAutoMap(header: string): CSVColumnKey | null {
@@ -135,11 +135,11 @@ function finalizeCSVRow(row: CSVRow): CSVRow {
   return row;
 }
 
-/** Apply auto-detected and user-chosen column mappings to raw parsed rows. */
-export function applyColumnMappings(
+/** Build effective header → canonical map from auto-detected and user mappings. */
+export function buildHeaderToCanonicalMap(
   parsed: RawParsedTable,
   userMappings: Record<string, ColumnMappingChoice>,
-): CSVRow[] {
+): Map<string, CSVColumnKey> {
   const headerToCanonical = new Map<string, CSVColumnKey>();
 
   for (const [header, canonical] of Object.entries(parsed.autoMapped)) {
@@ -152,6 +152,43 @@ export function applyColumnMappings(
       headerToCanonical.set(header, choice);
     }
   }
+
+  return headerToCanonical;
+}
+
+/** Warn when multiple columns map to the same canonical field (first column in file order wins). */
+export function getDuplicateMappingWarnings(
+  parsed: RawParsedTable,
+  userMappings: Record<string, ColumnMappingChoice>,
+): string[] {
+  const headerToCanonical = buildHeaderToCanonicalMap(parsed, userMappings);
+  const canonicalToHeaders = new Map<CSVColumnKey, string[]>();
+
+  for (const header of parsed.originalHeaders) {
+    const canonical = headerToCanonical.get(header);
+    if (!canonical) continue;
+    const list = canonicalToHeaders.get(canonical) ?? [];
+    list.push(header);
+    canonicalToHeaders.set(canonical, list);
+  }
+
+  const warnings: string[] = [];
+  for (const [canonical, headers] of canonicalToHeaders) {
+    if (headers.length <= 1) continue;
+    warnings.push(
+      `Multiple columns map to ${CSV_COLUMN_LABELS[canonical]} (${headers.join(', ')}). ` +
+      `Only "${headers[0]}" will be used.`,
+    );
+  }
+  return warnings;
+}
+
+/** Apply auto-detected and user-chosen column mappings to raw parsed rows. */
+export function applyColumnMappings(
+  parsed: RawParsedTable,
+  userMappings: Record<string, ColumnMappingChoice>,
+): CSVRow[] {
+  const headerToCanonical = buildHeaderToCanonicalMap(parsed, userMappings);
 
   return parsed.rawRows.map(rawRow => {
     const row: CSVRow = {};
@@ -215,8 +252,8 @@ export function normalizeCondition(value: string): EbayCondition | null {
   if (!v) return null;
 
   if (['nm', 'near mint', 'mint', 'm', 'near mint mint'].includes(v)) return 'Like New';
-  if (['lp', 'lightly played', 'light played', 'ex', 'excellent'].includes(v)) return 'Very Good';
-  if (['mp', 'moderately played', 'mod played', 'vg', 'played'].includes(v)) return 'Good';
+  if (['lp', 'lightly played', 'light played', 'ex', 'excellent', 'played'].includes(v)) return 'Very Good';
+  if (['mp', 'moderately played', 'mod played', 'vg'].includes(v)) return 'Good';
   if (['hp', 'heavily played', 'heavy played'].includes(v)) return 'Acceptable';
   if (['dmg', 'damaged', 'poor', 'dm'].includes(v)) return 'For Parts or Not Working';
   if (v === 'new') return 'New';

@@ -1,5 +1,7 @@
 import { getSupabase, isSupabaseConfigured, LISTING_IMAGES_BUCKET } from '../lib/supabase';
 
+export { isPersistentImageUrl } from './imageUrl';
+
 const EXT_BY_MIME: Record<string, string> = {
   'image/jpeg': '.jpg',
   'image/png': '.png',
@@ -13,6 +15,30 @@ function resolveExtension(file: File): string {
   const fromName = file.name.includes('.') ? `.${file.name.split('.').pop()!.toLowerCase()}` : '';
   if (fromName && Object.values(EXT_BY_MIME).includes(fromName)) return fromName;
   return EXT_BY_MIME[file.type] ?? '.jpg';
+}
+
+/** Upload scan/camera photo to Supabase when it is still a local blob URL. */
+export async function persistPhotoScanImage(
+  photoUrl: string | undefined,
+  sourceFile: File | undefined,
+): Promise<{ photoUrl?: string; userImageUrl?: string; preferredImageSource?: 'catalog' | 'user' }> {
+  const needsUpload =
+    (photoUrl?.startsWith('blob:') || photoUrl?.startsWith('data:')) && sourceFile;
+
+  if (!needsUpload) {
+    return {};
+  }
+
+  if (!isSupabaseConfigured()) {
+    return {};
+  }
+
+  const uploaded = await uploadProductImage(sourceFile);
+  return {
+    photoUrl: uploaded,
+    userImageUrl: uploaded,
+    preferredImageSource: 'user',
+  };
 }
 
 /** Upload a listing image to Supabase Storage. */
@@ -50,9 +76,3 @@ export async function uploadProductImage(file: File): Promise<string> {
   return data.publicUrl;
 }
 
-/** True when the URL is suitable for eBay export (public HTTP/S URL, not a blob). */
-export function isPersistentImageUrl(url: string | null | undefined): boolean {
-  if (!url) return false;
-  if (url.startsWith('blob:') || url.startsWith('data:')) return false;
-  return url.startsWith('http://') || url.startsWith('https://');
-}

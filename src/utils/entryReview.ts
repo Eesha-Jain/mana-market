@@ -10,8 +10,7 @@ export interface EntryReviewDraft {
   quantity: number;
   condition: EbayCondition | null;
   description: string;
-  pricingMode: PricingMode;
-  percentBelow: number;
+  /** Imported CSV price — review modal applies user pricing defaults. */
   manualPrice: number;
 }
 
@@ -47,8 +46,26 @@ export function buildEntryDraft(input: ManualEntryInput): EntryReviewDraft {
     quantity: input.quantity && input.quantity > 0 ? input.quantity : 1,
     condition: input.condition ? normalizeCondition(input.condition) : null,
     description: input.notes?.trim() ?? '',
-    pricingMode: hasManualPrice ? 'manual' : 'market',
-    percentBelow: 10,
     manualPrice: hasManualPrice ? parsedPrice : 0,
+  };
+}
+
+/** Pricing fields for the review modal — honors user defaults and CSV import price. */
+export function entryDraftPricingDefaults(draft: EntryReviewDraft): {
+  initialPricingMode: PricingMode;
+  initialPercentBelow: number;
+  initialManualPrice: number;
+} {
+  if (draft.manualPrice > 0) {
+    return {
+      initialPricingMode: 'manual',
+      initialPercentBelow: 10,
+      initialManualPrice: draft.manualPrice,
+    };
+  }
+  return {
+    initialPricingMode: 'market',
+    initialPercentBelow: 10,
+    initialManualPrice: 0,
   };
 }

@@ -1,13 +1,13 @@
 import {
   createContext,
   useContext,
-  useReducer,
   useEffect,
   useRef,
   useState,
+  useCallback,
   type ReactNode,
 } from 'react';
-import type { ItemListing, EbayCondition, Product } from '../types';
+import type { ItemListing, Product } from '../types';
 import { generateListingId } from '../types';
 import { useAuth } from './AuthContext';
 import { useUserSettings } from './UserSettingsContext';
@@ -17,14 +17,12 @@ import {
   deleteListing,
   fetchListings,
   insertListing,
-  insertListings,
-  patchListing,
+  updateListing,
 } from '../lib/supabaseDb';
 
 type Action =
   | { type: 'SET_ITEMS'; items: ItemListing[] }
   | { type: 'ADD_ITEM'; item: ItemListing }
-  | { type: 'ADD_ITEMS'; items: ItemListing[] }
   | { type: 'UPDATE_ITEM'; id: string; updates: Partial<ItemListing> }
   | { type: 'REMOVE_ITEM'; id: string }
   | { type: 'CLEAR_ITEMS' };
@@ -33,7 +31,6 @@ function reducer(items: ItemListing[], action: Action): ItemListing[] {
   switch (action.type) {
     case 'SET_ITEMS':   return action.items;
     case 'ADD_ITEM':    return [...items, action.item];
-    case 'ADD_ITEMS':   return [...items, ...action.items];
     case 'UPDATE_ITEM': return items.map(i => i.id === action.id ? { ...i, ...action.updates } : i);
     case 'REMOVE_ITEM': return items.filter(i => i.id !== action.id);
     case 'CLEAR_ITEMS': return [];
@@ -44,29 +41,25 @@ function reducer(items: ItemListing[], action: Action): ItemListing[] {
 interface ItemsContextType {
   items: ItemListing[];
   isLoading: boolean;
+  syncError: string | null;
+  loadError: string | null;
+  clearSyncError: () => void;
+  clearLoadError: () => void;
   addItem: (query: string, source?: 'manual' | 'csv' | 'photo', overrides?: Partial<ItemListing>) => ItemListing;
-  addItems: (rows: AddItemRow[]) => ItemListing[];
   updateItem: (id: string, updates: Partial<ItemListing>) => void;
   removeItem: (id: string) => void;
   clearItems: () => void;
-}
-
-interface AddItemRow {
-  query: string;
-  originalUpc?: string;
-  originalSku?: string;
-  quantity?: number;
-  condition?: EbayCondition | null;
-  notes?: string;
-  manualPrice?: number;
-  photoUrl?: string;
-  source?: 'manual' | 'csv' | 'photo';
 }
 
 const ItemsContext = createContext<ItemsContextType | null>(null);
 
 function localStorageKey(userId: string) {
   return `mtg_lister_items_${userId}`;
+}
+
+function formatSyncError(err: unknown, action: string): string {
+  const detail = err instanceof Error ? err.message : String(err);
+  return `Could not ${action}: ${detail}. Your local changes are kept but may not persist after refresh.`;
 }
 
 /** Migrate legacy items that used card / sealedProduct fields. */
@@ -137,23 +130,40 @@ function makeItem(
 export function ItemsProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const { settings } = useUserSettings();
-  const [items, dispatch] = useReducer(reducer, []);
+  const [items, setItems] = useState<ItemListing[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const itemsRef = useRef(items);
   itemsRef.current = items;
 
+  const dispatchItems = useCallback((action: Action) => {
+    setItems(prev => {
+      const next = reducer(prev, action);
+      itemsRef.current = next;
+      return next;
+    });
+  }, []);
+
+  const clearSyncError = useCallback(() => setSyncError(null), []);
+  const clearLoadError = useCallback(() => setLoadError(null), []);
+
   useEffect(() => {
     if (!user) {
-      dispatch({ type: 'CLEAR_ITEMS' });
+      dispatchItems({ type: 'CLEAR_ITEMS' });
       setIsLoading(false);
+      setLoadError(null);
       return;
     }
 
     if (isSupabaseConfigured()) {
       setIsLoading(true);
+      setLoadError(null);
       fetchListings(user.id)
-        .then(loaded => dispatch({ type: 'SET_ITEMS', items: loaded.map(ensureListingFields) }))
-        .catch(() => dispatch({ type: 'CLEAR_ITEMS' }))
+        .then(loaded => dispatchItems({ type: 'SET_ITEMS', items: loaded.map(ensureListingFields) }))
+        .catch(err => {
+          setLoadError(formatSyncError(err, 'load your listings'));
+        })
         .finally(() => setIsLoading(false));
       return;
     }
@@ -162,23 +172,24 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
       const raw = localStorage.getItem(localStorageKey(user.id));
       if (raw) {
         const parsed = JSON.parse(raw) as Record<string, unknown>[];
-        dispatch({
+        dispatchItems({
           type: 'SET_ITEMS',
           items: parsed.map(r => ensureListingFields(migrateStoredItem(r))),
         });
       } else {
-        dispatch({ type: 'CLEAR_ITEMS' });
+        dispatchItems({ type: 'CLEAR_ITEMS' });
       }
     } catch {
-      dispatch({ type: 'CLEAR_ITEMS' });
+      dispatchItems({ type: 'CLEAR_ITEMS' });
+      setLoadError('Could not read saved listings from this browser.');
     }
     setIsLoading(false);
-  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user?.id, dispatchItems]);
 
   useEffect(() => {
     if (!user || isSupabaseConfigured()) return;
     localStorage.setItem(localStorageKey(user.id), JSON.stringify(items));
-  }, [items, user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [items, user?.id]);
 
   const addItem = (
     query: string,
@@ -186,59 +197,61 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
     overrides: Partial<ItemListing> = {},
   ) => {
     const item = makeItem(settings, query, source, overrides);
-    dispatch({ type: 'ADD_ITEM', item });
+    dispatchItems({ type: 'ADD_ITEM', item });
     if (user && isSupabaseConfigured()) {
-      void insertListing(item, user.id);
+      void insertListing(item, user.id).catch(err => {
+        setSyncError(formatSyncError(err, 'save listing'));
+      });
     }
     return item;
   };
 
-  const addItems = (rows: AddItemRow[]) => {
-    const newItems = rows.map(r =>
-      makeItem(settings, r.query, r.source ?? 'csv', {
-        originalUpc: r.originalUpc,
-        originalSku: r.originalSku,
-        quantity:    r.quantity ?? 1,
-        condition:   r.condition ?? null,
-        notes:       r.notes ?? '',
-        manualPrice: r.manualPrice ?? 0,
-        photoUrl:    r.photoUrl,
-        pricingMode: r.manualPrice ? 'manual' : 'market',
-      })
-    );
-    dispatch({ type: 'ADD_ITEMS', items: newItems });
-    if (user && isSupabaseConfigured()) {
-      void insertListings(newItems, user.id);
-    }
-    return newItems;
-  };
-
   const updateItem = (id: string, updates: Partial<ItemListing>) => {
-    dispatch({ type: 'UPDATE_ITEM', id, updates });
-    if (user && isSupabaseConfigured()) {
-      const current = itemsRef.current.find(i => i.id === id);
-      if (current) {
-        void patchListing(id, user.id, current, updates);
+    dispatchItems({ type: 'UPDATE_ITEM', id, updates });
+
+    queueMicrotask(() => {
+      const merged = itemsRef.current.find(i => i.id === id);
+      if (merged && user && isSupabaseConfigured()) {
+        void updateListing(merged, user.id).catch(err => {
+          setSyncError(formatSyncError(err, 'update listing'));
+        });
       }
-    }
+    });
   };
 
   const removeItem = (id: string) => {
-    dispatch({ type: 'REMOVE_ITEM', id });
+    dispatchItems({ type: 'REMOVE_ITEM', id });
     if (user && isSupabaseConfigured()) {
-      void deleteListing(id, user.id);
+      void deleteListing(id, user.id).catch(err => {
+        setSyncError(formatSyncError(err, 'delete listing'));
+      });
     }
   };
 
   const clearItems = () => {
-    dispatch({ type: 'CLEAR_ITEMS' });
+    dispatchItems({ type: 'CLEAR_ITEMS' });
     if (user && isSupabaseConfigured()) {
-      void deleteAllListings(user.id);
+      void deleteAllListings(user.id).catch(err => {
+        setSyncError(formatSyncError(err, 'clear listings'));
+      });
     }
   };
 
   return (
-    <ItemsContext.Provider value={{ items, isLoading, addItem, addItems, updateItem, removeItem, clearItems }}>
+    <ItemsContext.Provider
+      value={{
+        items,
+        isLoading,
+        syncError,
+        loadError,
+        clearSyncError,
+        clearLoadError,
+        addItem,
+        updateItem,
+        removeItem,
+        clearItems,
+      }}
+    >
       {children}
     </ItemsContext.Provider>
   );

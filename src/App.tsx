@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ItemsProvider } from './contexts/ItemsContext';
 import { UserSettingsProvider } from './contexts/UserSettingsContext';
 import { SearchProcessor } from './components/SearchProcessor';
+import { SyncErrorBanner } from './components/SyncErrorBanner';
 import { Navbar } from './components/Navbar';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
@@ -32,6 +33,7 @@ function AppRoutes() {
     <>
       <SearchProcessor />
       <Navbar />
+      <SyncErrorBanner />
       <main className="main-content">
         <Routes>
           <Route path="/login"    element={<LoginPage />} />

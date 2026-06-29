@@ -1,138 +1,100 @@
-# magic-the-gathering
+# Mana Market
 
-React + TypeScript app scaffolded with Vite, plus Playwright end-to-end testing and Playwright MCP configuration.
+**List Magic: The Gathering sealed products on eBay — faster.**
 
-## Scripts
+Mana Market is a web app for MTG sellers who need to turn a pile of booster boxes, bundles, commander decks, and other sealed product into priced, export-ready eBay listings. Instead of researching each item by hand, you add inventory in bulk, let the app match products and market prices, review the details once, and export when you're ready to list.
 
-- npm run dev
-- npm run typecheck
-- npm run build
-- npm run preview
-- npm run lint
-- npm run playwright:install
-- npm run test:e2e
-- npm run test:e2e:ui
-- npm run mcp:playwright
+---
 
-## Playwright E2E
+## Who it's for
 
-1. Install browser binaries:
+Mana Market is built for sellers who work with **sealed MTG product** — not individual card inventory. If you buy collections, run a small shop, or list from a spreadsheet of UPCs and product names, the app is meant to cut the repetitive lookup and data-entry work between "I have this stuff" and "I can upload it to eBay."
 
-	npm run playwright:install
+---
 
-2. Run tests:
+## What it does
 
-	npm run test:e2e
+### Add inventory your way
 
-## Professional Workflow
+You can bring items in through several paths, all leading into the same review queue:
 
-Run these checks before shipping:
+- **Single entry** — type a product name, SKU, or UPC (or combine name + identifier in one line).
+- **Bulk paste** — one product per line, same parsing rules as single entry.
+- **CSV / spreadsheet** — upload or paste from Excel or Google Sheets; common column names are recognized automatically, and unrecognized columns can be mapped before import.
+- **Photo scan** — photograph a UPC barcode or the front product label; OCR reads the packaging and prefills title and details for review.
 
-1. npm run typecheck
-2. npm run lint
-3. npm run build
-4. npm run test:e2e
+Each row or photo goes through a **review step** before it joins your queue, so nothing is added blindly.
 
-## Playwright MCP
+### Smart product lookup
 
-The workspace includes [VS Code MCP config](.vscode/mcp.json) that runs Playwright MCP via npx.
+When you add an item, Mana Market tries to identify it using:
 
-MCP server config:
+- **UPC / barcode lookup** (catalog title, images, offer prices)
+- **eBay sold listings** (recent completed sales for pricing and title hints)
+- **SKU and product name** as secondary hints when a barcode alone isn't enough
 
-- command: npx
-- args: @playwright/mcp@latest
+If multiple products match, you pick the right one in a disambiguation dialog. If nothing matches online, you can still edit title, description, condition, and price manually and add the listing to your batch.
 
-If your MCP client supports workspace configuration, point it to .vscode/mcp.json.
+### Review, condition, and pricing
 
-## Supabase setup
+The **Review & Price** workspace is where you finalize listings before export:
 
-User accounts, listings, settings, and listing images are stored in [Supabase](https://supabase.com). Without Supabase env vars, the app falls back to browser localStorage (fine for local dev / tests only).
+- Set **eBay condition** (New, Like New, Very Good, etc.) and quantity per item.
+- Choose **pricing mode**: match market price, list a percentage below market, or set a manual price.
+- When both eBay sold data and UPC catalog prices exist, pick which source to trust (or compare options per item).
+- Edit listing title and description, choose catalog vs. your own photo, and add seller notes.
+- Filter by **ready**, **needs action**, or **all** to focus on what's blocking export.
 
-### 1. Create a Supabase project
+Your defaults (pricing rules, text casing, photo scan preferences, market price source) can be saved so repeat batches stay consistent.
 
-1. Go to [supabase.com/dashboard](https://supabase.com/dashboard) → **New project**
-2. Pick a name, database password, and region → **Create**
+### Export for eBay
 
-### 2. Run the database schema
+When a listing has a matched product, condition, and valid price, it's **export-ready**. Mana Market generates:
 
-1. In your project, open **SQL Editor** → **New query**
-2. Paste the contents of [`supabase/schema.sql`](supabase/schema.sql)
-3. Click **Run**
+- **eBay JSON** — structured listing payloads (title, description, category, condition ID, price, pictures, item specifics) for bulk listing tools or custom workflows.
+- **CSV** — a configurable spreadsheet of listing fields for manual upload or downstream tools.
 
-This creates `profiles`, `listings`, `user_settings`, row-level security policies, a signup trigger, and storage policies.
+Exported items are marked in the app so you don't double-export the same batch.
 
-### 3. Create the image bucket
+### Dashboard and queue
 
-1. Open **Storage** → **New bucket**
-2. Name: **`listing-images`**
-3. Enable **Public bucket** (required so eBay can fetch image URLs)
-4. Click **Create**
+A **dashboard** summarizes your current batch: how many items are ready, need a condition, are still searching, or couldn't be matched. The upload queue shows recent additions and status at a glance so you can jump into review without losing track of a large import.
 
-If the SQL already ran, the bucket may exist — just confirm it is **public**.
+---
 
-### 4. Configure auth (recommended)
+## How a typical batch works
 
-In **Authentication** → **Providers** → **Email**:
+1. **Add** — Import a spreadsheet, paste a list, or scan photos of product labels.
+2. **Review each entry** — Confirm or edit matched product details, condition, and pricing as items enter the queue.
+3. **Triage on Review** — Fix ambiguous matches, set missing conditions, adjust prices across the batch.
+4. **Export** — Download eBay-ready JSON or CSV and list on your seller account.
 
-- Turn **Confirm email** **off** for easier local testing, or leave it on and confirm via inbox after signup
-- Set **Site URL** to your app URL (e.g. `http://localhost:5173` for dev, `https://your-app.vercel.app` for production)
+The app is designed around **batches**: you don't have to finish one item completely before moving on, and you can apply settings like condition to remaining items during a multi-row import.
 
-### 5. Copy API keys to `.env`
+---
 
-In **Project Settings** → **API**, copy:
+## Product data and images
 
-| Supabase field | `.env` variable |
-|---|---|
-| Project URL | `VITE_SUPABASE_URL` |
-| anon public key | `VITE_SUPABASE_ANON_KEY` |
+- **Market prices** come from eBay completed sales and UPC catalog data when available; the app shows ranges and sold counts where the APIs provide them.
+- **Images** can come from catalog lookup, eBay sold listings, or photos you upload or capture during a scan. You choose which image represents the listing.
+- **Listing IDs** — each item gets a short reference ID (e.g. `MTG-X7K2P9`) for spreadsheets and inventory tracking.
 
-Create a `.env` file (see [.env.example](.env.example)):
+Mana Market prepares listing *data* for eBay; it does not post listings to eBay on your behalf. You export and upload through your normal seller workflow.
 
-```env
-VITE_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
-VITE_SUPABASE_ANON_KEY=your-anon-key
-EBAY_APP_ID=your-ebay-app-id
-```
+---
 
-Restart `npm run dev` after changing `.env`.
+## Accounts and data
 
-### What gets stored where
+Sign in to keep **listings**, **settings**, and **uploaded photos** synced across sessions. Listings retain import metadata (original UPC/SKU, source, notes) even when you override the display title for eBay.
 
-| Data | Supabase location |
-|---|---|
-| Login / passwords | Supabase Auth (`auth.users`) |
-| Display name | `profiles` table |
-| Card listings | `listings` table (product JSON in `product` column) |
-| User defaults (pricing, photo type, etc.) | `user_settings` table |
-| Uploaded listing photos | `listing-images` storage bucket (`{user_id}/{uuid}.jpg`) |
+---
 
-## Deploy to Vercel
+## Scope and limitations
 
-The frontend is a static Vite build. Product search still uses `/api/search` serverless functions. Auth, listings, settings, and images go through Supabase directly from the browser.
+Mana Market is optimized for **sealed MTG product** (booster boxes, bundles, commander decks, promo packs, etc.). It is not a full card-by-card inventory system or a live eBay integration.
 
-### 1. Connect the repo
+Lookup quality depends on barcodes, product names, and what's available in UPC and eBay data — obscure or mislabeled product may need manual review. Photo OCR works best on clear label or barcode shots.
 
-Import the project in [Vercel](https://vercel.com). The included `vercel.json` sets the build command and SPA fallback.
+---
 
-### 2. Set environment variables
-
-In **Project → Settings → Environment Variables**, add:
-
-| Variable | Required | Description |
-|---|---|---|
-| `VITE_SUPABASE_URL` | Yes | Supabase project URL |
-| `VITE_SUPABASE_ANON_KEY` | Yes | Supabase anon key (safe with RLS) |
-| `EBAY_APP_ID` | Recommended | eBay Finding API app ID for product search |
-
-Also add the same Supabase vars to your local `.env` for dev.
-
-### 3. Update Supabase auth URLs
-
-In Supabase **Authentication** → **URL configuration**, set **Site URL** to your Vercel domain and add it under **Redirect URLs**.
-
-### 4. Verify
-
-1. Register / sign in on your deployed app
-2. Add a listing and upload an image
-3. In Supabase **Table Editor**, confirm rows appear in `listings`
-4. In **Storage → listing-images**, confirm the uploaded file exists
+*Mana Market — from inventory to export-ready eBay listings in one place.*
