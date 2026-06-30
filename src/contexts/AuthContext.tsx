@@ -54,24 +54,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const supabase = getSupabase();
     let active = true;
 
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (!active) return;
-      if (session?.user) {
-        const resolved = await resolveSupabaseUser(session.user.id, session.user.email);
-        if (active) setUser(resolved);
-      }
+    const finishLoading = () => {
       if (active) setIsLoading(false);
-    });
+    };
+
+    supabase.auth.getSession()
+      .then(async ({ data: { session } }) => {
+        if (!active) return;
+        finishLoading();
+        if (!session?.user) return;
+
+        try {
+          const resolved = await resolveSupabaseUser(session.user.id, session.user.email);
+          if (active) setUser(resolved);
+        } catch (err) {
+          console.error('[auth] resolveSupabaseUser', err);
+          if (active) {
+            setUser({
+              id: session.user.id,
+              email: session.user.email?.toLowerCase() ?? '',
+              name: session.user.email?.split('@')[0] ?? 'User',
+            });
+          }
+        }
+      })
+      .catch(err => {
+        console.error('[auth] getSession', err);
+        finishLoading();
+      });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (!active) return;
+      finishLoading();
       if (session?.user) {
-        const resolved = await resolveSupabaseUser(session.user.id, session.user.email);
-        setUser(resolved);
+        try {
+          const resolved = await resolveSupabaseUser(session.user.id, session.user.email);
+          if (active) setUser(resolved);
+        } catch (err) {
+          console.error('[auth] resolveSupabaseUser', err);
+          if (active) {
+            setUser({
+              id: session.user.id,
+              email: session.user.email?.toLowerCase() ?? '',
+              name: session.user.email?.split('@')[0] ?? 'User',
+            });
+          }
+        }
       } else {
         setUser(null);
       }
-      setIsLoading(false);
     });
 
     return () => {
