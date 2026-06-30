@@ -26,3 +26,6 @@ dist-ssr
 *.tsbuildinfo
 
 test-results/*
+.vercel
+.env*
+.cursor/*

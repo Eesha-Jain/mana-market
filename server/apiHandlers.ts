@@ -1,8 +1,8 @@
 import 'dotenv/config';
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { searchItem } from './search';
-import { extractTextFromImageBase64, extractUpcFromImageBase64, isGeminiConfigured } from './ocr';
+import { searchItem } from './search.js';
+import { extractTextFromImageBase64, extractUpcFromImageBase64, isGeminiConfigured } from './ocr.js';
 
 export function sendJson(res: ServerResponse, status: number, body: unknown): void {
   res.statusCode = status;

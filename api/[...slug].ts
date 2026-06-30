@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { handleApiRequest, sendJson } from '../server/apiHandlers';
+import { handleApiRequest, sendJson } from '../server/apiHandlers.js';
 
 type VercelRequest = IncomingMessage & {
   query: Record<string, string | string[] | undefined>;
