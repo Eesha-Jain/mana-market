@@ -6,9 +6,8 @@ type VercelRequest = IncomingMessage & {
 };
 
 export default async function handler(req: VercelRequest, res: ServerResponse): Promise<void> {
-  const slug = req.query.slug;
-  const parts = Array.isArray(slug) ? slug : slug ? [slug] : [];
-  const pathname = `/api/${parts.join('/')}`;
+  // Vercel non-Next catch-all files do not populate req.query.slug; use req.url.
+  const pathname = new URL(req.url ?? '/', 'http://localhost').pathname;
 
   const handled = await handleApiRequest(req, res, pathname);
   if (!handled) {
