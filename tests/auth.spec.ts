@@ -3,6 +3,7 @@ import {
   clearAppStorage,
   loginUser,
   registerUser,
+  signOutUser,
   uniqueTestUser,
 } from './helpers/auth';
 
@@ -48,8 +49,7 @@ test.describe('authentication', () => {
   test('prevents duplicate registration', async ({ page }) => {
     const user = uniqueTestUser('dup');
     await registerUser(page, user);
-    await page.getByRole('button', { name: 'Sign out' }).click();
-    await expect(page).toHaveURL(/\/login/);
+    await signOutUser(page);
 
     await page.goto('/register');
     await page.getByLabel('Display Name').fill('Another Name');
@@ -63,7 +63,7 @@ test.describe('authentication', () => {
   test('logs in with valid credentials', async ({ page }) => {
     const user = uniqueTestUser('login');
     await registerUser(page, user);
-    await page.getByRole('button', { name: 'Sign out' }).click();
+    await signOutUser(page);
 
     await loginUser(page, user);
     await expect(page.getByText(`Welcome back, ${user.name}`)).toBeVisible();
@@ -72,7 +72,7 @@ test.describe('authentication', () => {
   test('shows error for wrong password', async ({ page }) => {
     const user = uniqueTestUser('wrongpw');
     await registerUser(page, user);
-    await page.getByRole('button', { name: 'Sign out' }).click();
+    await signOutUser(page);
 
     await page.goto('/login');
     await page.getByLabel('Email').fill(user.email);
@@ -98,7 +98,7 @@ test.describe('authentication', () => {
 
   test('logout clears session and protects routes again', async ({ page }) => {
     await registerUser(page);
-    await page.getByRole('button', { name: 'Sign out' }).click();
+    await signOutUser(page);
     await page.goto('/dashboard');
     await expect(page).toHaveURL(/\/login/);
   });

@@ -16,13 +16,13 @@ test.describe('navigation', () => {
 
   test('highlights active nav link per route', async ({ page }) => {
     await page.goto('/upload');
-    await expect(page.getByRole('link', { name: 'Upload' })).toHaveClass(/active/);
+    await expect(page.getByRole('navigation').getByRole('link', { name: 'Upload', exact: true })).toHaveClass(/active/);
 
     await page.goto('/review');
-    await expect(page.getByRole('link', { name: 'Review' })).toHaveClass(/active/);
+    await expect(page.getByRole('navigation').getByRole('link', { name: 'Review' })).toHaveClass(/active/);
 
     await page.goto('/settings');
-    await expect(page.getByRole('link', { name: 'Settings' })).toHaveClass(/active/);
+    await expect(page.getByRole('navigation').getByRole('link', { name: 'Settings' })).toHaveClass(/active/);
   });
 
   test('root redirects to dashboard when logged in', async ({ page }) => {

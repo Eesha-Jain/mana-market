@@ -1,0 +1,1 @@
+{"root":["./server/apihandlers.ts","./server/ocr.ts","./server/search.ts","./api/health.ts","./api/ocr.ts","./api/search.ts"],"version":"6.0.3"}

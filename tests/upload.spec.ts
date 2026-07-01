@@ -126,7 +126,7 @@ test.describe('upload page', () => {
     await confirmEntryReview(page, 'Done → next');
     await confirmEntryReview(page, 'Done');
 
-    await expect(page.getByText('Items added to queue!')).toBeVisible();
+    await expect(page.getByText('Items added to your review queue.')).toBeVisible();
     await expect(page.getByText('Current Queue (2)')).toBeVisible();
   });
 
@@ -166,7 +166,7 @@ test.describe('upload page', () => {
     await expect(page.locator('.bulk-textarea')).toBeVisible();
 
     await page.getByRole('button', { name: 'Photo Scan' }).click();
-    await expect(page.getByText(/Photograph product labels/i)).toBeVisible();
+    await expect(page.getByText(/Photograph product packaging/i)).toBeVisible();
 
     await page.getByRole('button', { name: 'Single Entry' }).click();
     await expect(page.getByPlaceholder(/Modern Horizons/i)).toBeVisible();

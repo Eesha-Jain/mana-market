@@ -43,7 +43,7 @@ test.describe('settings page', () => {
   });
 
   test('shows default pricing controls', async ({ page }) => {
-    await expect(page.getByText('Default pricing')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Default pricing' })).toBeVisible();
     await expect(page.getByText('Default pricing mode')).toBeVisible();
   });
 

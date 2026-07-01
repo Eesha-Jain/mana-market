@@ -52,9 +52,25 @@ export async function mockHealthApi(page: Page, ebayConfigured = false) {
       body: JSON.stringify({
         ok: true,
         ebayConfigured,
+        geminiConfigured: true,
         supabaseConfigured: false,
         version: '1.0.0',
       }),
+    });
+  });
+}
+
+export async function mockOcrApi(
+  page: Page,
+  labelText = 'Modern Horizons 3 Booster Box\nWizards of the Coast',
+) {
+  await page.route('**/api/ocr**', async route => {
+    const body = route.request().postDataJSON() as { mode?: string };
+    const text = body.mode === 'upc' ? '630509777771' : labelText;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ text, mode: body.mode ?? 'label' }),
     });
   });
 }
