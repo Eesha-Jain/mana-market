@@ -14,7 +14,7 @@ let client: SupabaseClient | null = null;
 export function getSupabase(): SupabaseClient {
   if (!isSupabaseConfigured()) {
     throw new Error(
-      'Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env',
+      'Supabase is not configured. Set NEXT_APP_SUPABASE_URL and NEXT_APP_SUPABASE_ANON_KEY in .env',
     );
   }
 

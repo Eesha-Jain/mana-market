@@ -6,6 +6,9 @@ export const metadata: Metadata = {
   title: 'Mana Market',
   description:
     'Mana Market — list Magic: The Gathering sealed products on eBay with UPC lookup, OCR photo scan, and pricing tools.',
+  icons: {
+    icon: '/logo.svg',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -1,3 +1,4 @@
+import { serverEnv } from '@/lib/env';
 import { GoogleGenAI } from '@google/genai';
 import {
   OCR_PASS1_PROMPT,
@@ -11,11 +12,11 @@ const PASS1_MAX_OUTPUT_TOKENS = 1024;
 const PASS2_MAX_OUTPUT_TOKENS = 768;
 
 export function isGeminiConfigured(): boolean {
-  return !!(process.env.GEMINI_API_KEY?.trim() || process.env.VITE_GEMINI_API_KEY?.trim());
+  return !!serverEnv('GEMINI_API_KEY');
 }
 
 function geminiApiKey(): string {
-  const key = process.env.GEMINI_API_KEY?.trim() || process.env.VITE_GEMINI_API_KEY?.trim();
+  const key = serverEnv('GEMINI_API_KEY');
   if (!key) {
     throw new Error('Gemini OCR is not configured. Set GEMINI_API_KEY on the server.');
   }
@@ -23,9 +24,7 @@ function geminiApiKey(): string {
 }
 
 function ocrModel(): string {
-  return process.env.GEMINI_OCR_MODEL?.trim()
-    || process.env.VITE_GEMINI_OCR_MODEL?.trim()
-    || defaultModel;
+  return serverEnv('GEMINI_OCR_MODEL') || defaultModel;
 }
 
 function responseText(response: { text?: string | null }): string {

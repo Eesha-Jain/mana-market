@@ -3,7 +3,7 @@ import { defineConfig, devices } from '@playwright/test';
 const localBaseURL = 'http://127.0.0.1:3000';
 const devBaseURL = 'http://127.0.0.1:3000';
 const productionBaseURL =
-  process.env.PLAYWRIGHT_BASE_URL?.trim() || 'https://mana-market-peach.vercel.app';
+  process.env.PLAYWRIGHT_BASE_URL?.trim() || 'https://mana-market-eta.vercel.app';
 
 /** Which preview server to start: local (test build), dev (next dev), or none (live URL only). */
 const serverMode = process.env.PW_SERVER ?? 'local';

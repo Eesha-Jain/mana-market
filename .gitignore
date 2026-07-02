@@ -38,3 +38,6 @@ playwright-report/
 *.tsbuildinfo
 
 .cursor/*
+
+.vercel
+.env*

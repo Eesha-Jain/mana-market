@@ -4,12 +4,12 @@ import {
   extractUpcFromImageBase64,
   isGeminiConfigured,
 } from '@/server/ocr';
-import { publicEnv } from '@/lib/env';
+import { publicEnv, serverEnv } from '@/lib/env';
 
 export function healthPayload() {
   return {
     ok: true,
-    ebayConfigured: !!process.env.EBAY_APP_ID,
+    ebayConfigured: !!serverEnv('EBAY_APP_ID'),
     geminiConfigured: isGeminiConfigured(),
     supabaseConfigured: !!(
       publicEnv('SUPABASE_URL') &&

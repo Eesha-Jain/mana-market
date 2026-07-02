@@ -1,3 +1,5 @@
+import { serverEnv } from '@/lib/env';
+
 // ─── UPC / Barcode lookup (UPCitemdb — 100/day, no key) ─────────────────────
 
 interface UpcOffer {
@@ -135,7 +137,7 @@ function parseEbayItem(raw: EbayRawItem) {
 }
 
 async function fetchEbayItems(keywords: string): Promise<EbayRawItem[]> {
-  const appId = process.env.EBAY_APP_ID;
+  const appId = serverEnv('EBAY_APP_ID');
   if (!appId || !keywords) return [];
 
   const searchTerm = `${keywords} magic the gathering`;

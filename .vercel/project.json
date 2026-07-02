@@ -1,14 +1,11 @@
 {
-  "projectId": "prj_SWFoOYiVrJjARqdYn28tJ0L6cEFb",
-  "orgId": "team_4WWfNVbfDz5nGXA8hf04D8eH",
-  "projectName": "mana-market",
   "settings": {
-    "createdAt": 1782706658014,
-    "framework": "vite",
+    "createdAt": 1782966666335,
+    "framework": "nextjs",
     "devCommand": null,
     "installCommand": null,
     "buildCommand": null,
-    "outputDirectory": "dist",
+    "outputDirectory": null,
     "rootDirectory": null,
     "directoryListing": false,
     "nodeVersion": "24.x"

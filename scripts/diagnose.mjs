@@ -36,7 +36,7 @@ if (target === 'dev' || target === 'all') {
 }
 
 if (target === 'prod' || target === 'all') {
-  const url = process.env.PLAYWRIGHT_BASE_URL?.trim() || 'https://mana-market-peach.vercel.app';
+  const url = process.env.PLAYWRIGHT_BASE_URL?.trim() || 'https://mana-market-eta.vercel.app';
   console.log(`Production URL: ${url}`);
   run('Live production deployment', [
     '--project=production',
