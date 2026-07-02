@@ -1,7 +1,6 @@
 import { Link } from 'react-router-dom';
 import { BrandLogo } from '../components/BrandLogo';
 import { BrandWordmark } from '../components/BrandWordmark';
-import { DragonHeroScene } from '../components/home/DragonHeroScene';
 
 const FEATURES = [
   {
@@ -61,26 +60,26 @@ const STEPS = [
 ] as const;
 
 export function HomePage() {
-  const hero = (
-    <>
-      <BrandLogo variant="auth" decorative className="home-hero-logo" />
-      <BrandWordmark as="h1" className="home-hero-wordmark" />
-      <p className="home-hero-tagline">
-        List Magic: The Gathering sealed products on eBay — faster.
-      </p>
-      <p className="home-hero-description">
-        Upload inventory, match products with UPC lookup, scan photos with OCR,
-        price against market data, and export eBay-ready listings from one workspace.
-      </p>
-      <div className="home-hero-actions">
-        <Link to="/register" className="btn-primary btn-lg">Get started free</Link>
-        <Link to="/login" className="btn-secondary btn-lg">Sign in</Link>
-      </div>
-    </>
-  );
-
   return (
-    <DragonHeroScene hero={hero}>
+    <div className="home-page">
+      <section className="home-hero">
+        <div className="home-hero-inner">
+          <BrandLogo variant="auth" decorative className="home-hero-logo" />
+          <BrandWordmark as="h1" className="home-hero-wordmark" />
+          <p className="home-hero-tagline">
+            List Magic: The Gathering sealed products on eBay — faster.
+          </p>
+          <p className="home-hero-description">
+            Upload inventory, match products with UPC lookup, scan photos with OCR,
+            price against market data, and export eBay-ready listings from one workspace.
+          </p>
+          <div className="home-hero-actions">
+            <Link to="/register" className="btn-primary btn-lg">Get started free</Link>
+            <Link to="/login" className="btn-secondary btn-lg">Sign in</Link>
+          </div>
+        </div>
+      </section>
+
       <section className="home-section">
         <div className="home-section-header">
           <h2 className="home-section-title">Everything you need to list sealed product</h2>
@@ -124,6 +123,6 @@ export function HomePage() {
         </p>
         <Link to="/register" className="btn-primary btn-lg">Create account</Link>
       </section>
-    </DragonHeroScene>
+    </div>
   );
 }
