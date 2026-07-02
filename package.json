@@ -11,8 +11,11 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "verify": "node scripts/verify.mjs",
-    "smoke": "playwright test tests/smoke.spec.ts tests/auth.spec.ts tests/navigation.spec.ts",
-    "test:e2e": "playwright test",
+    "diagnose": "node scripts/diagnose.mjs all",
+    "diagnose:dev": "node scripts/diagnose.mjs dev",
+    "diagnose:prod": "node scripts/diagnose.mjs prod",
+    "smoke": "playwright test --project=local tests/smoke.spec.ts tests/auth.spec.ts tests/navigation.spec.ts",
+    "test:e2e": "playwright test --project=local",
     "test:e2e:ui": "playwright test --ui",
     "playwright:install": "playwright install chromium",
     "mcp:playwright": "npx @playwright/mcp@latest"

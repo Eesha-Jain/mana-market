@@ -18,6 +18,9 @@ function run(label, command, args) {
 console.log('Mana Market — local verification\n');
 
 run('TypeScript', 'npm', ['run', 'typecheck']);
-run('Playwright e2e (test build + preview server + browser tests)', 'npm', ['run', 'test:e2e']);
+run('Playwright e2e (test build + preview server + browser tests)', 'npm', [
+  'run',
+  'test:e2e',
+]);
 
 console.log('\n✓ All verification checks passed.');
