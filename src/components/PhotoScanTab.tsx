@@ -1,5 +1,7 @@
+'use client';
+
 import { useState, useRef, type ChangeEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/navigation';
 import { useItems } from '../contexts/ItemsContext';
 import { useUserSettings } from '../contexts/UserSettingsContext';
 import { buildPhotoReviewData } from '../utils/photoReview';
@@ -68,7 +70,7 @@ export function PhotoScanTab() {
     isDefaultConfigured,
     saveConfiguredDefault,
   } = useUserSettings();
-  const navigate = useNavigate();
+  const router = useRouter();
   const singleFileRef = useRef<HTMLInputElement>(null);
   const singleCameraRef = useRef<HTMLInputElement>(null);
   const bulkFileRef = useRef<HTMLInputElement>(null);
@@ -355,7 +357,7 @@ export function PhotoScanTab() {
     } else {
       resetSingle();
     }
-    navigate('/review');
+    router.push('/review');
   };
 
   const handleCancelBatch = () => {

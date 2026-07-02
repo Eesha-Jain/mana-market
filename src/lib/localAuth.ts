@@ -1,4 +1,5 @@
 import type { AppUser } from './supabaseDb';
+import { publicEnv } from './env';
 
 const USERS_KEY = 'mtg_lister_users';
 const SESSION_KEY = 'mtg_lister_session';
@@ -110,5 +111,5 @@ export function loadLocalSession(): AppUser | null {
 }
 
 export function isLocalAuthMode(): boolean {
-  return !import.meta.env.VITE_SUPABASE_URL?.trim() || !import.meta.env.VITE_SUPABASE_ANON_KEY?.trim();
+  return !publicEnv('SUPABASE_URL') || !publicEnv('SUPABASE_ANON_KEY');
 }

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Full local verification: typecheck → Playwright e2e (builds test bundle + preview server).
+ * Full local verification: typecheck → Playwright e2e (builds test bundle + next start).
  * Run: npm run verify
  */
 import { spawnSync } from 'node:child_process';
@@ -18,7 +18,7 @@ function run(label, command, args) {
 console.log('Mana Market — local verification\n');
 
 run('TypeScript', 'npm', ['run', 'typecheck']);
-run('Playwright e2e (test build + preview server + browser tests)', 'npm', [
+run('Playwright e2e (test build + next start + browser tests)', 'npm', [
   'run',
   'test:e2e',
 ]);

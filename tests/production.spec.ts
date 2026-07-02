@@ -4,7 +4,7 @@ import { attachDiagnostics, assertAuthSettles, formatDiagnostics } from './helpe
 /** Extra checks meant only for the live Vercel deployment. */
 test.describe('production deployment', () => {
   test('production bundle includes Supabase config', async ({ page }) => {
-    const scripts = page.locator('script[type="module"][src*="/assets/"]');
+    const scripts = page.locator('script[src*="/_next/"]');
     await page.goto('/');
     await assertAuthSettles(page);
 

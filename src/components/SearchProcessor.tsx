@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Background processor — resolves legacy idle items via the backend (UPC + eBay).
  * Upload and photo flows set status + product during entry review; this handles

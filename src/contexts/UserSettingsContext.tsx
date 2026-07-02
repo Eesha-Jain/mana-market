@@ -1,3 +1,5 @@
+'use client';
+
 import { createContext, useContext, useEffect, useRef, useState, useCallback, type ReactNode } from 'react';
 import { applyTextCase } from '../utils/textCase';
 import {

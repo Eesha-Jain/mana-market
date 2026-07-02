@@ -4,6 +4,8 @@ import { spawnSync } from 'node:child_process';
 
 const env = {
   ...process.env,
+  NEXT_PUBLIC_SUPABASE_URL: '',
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: '',
   VITE_SUPABASE_URL: '',
   VITE_SUPABASE_ANON_KEY: '',
 };
@@ -17,4 +19,4 @@ function run(label, command, args) {
 }
 
 run('Typecheck', 'npm', ['run', 'typecheck']);
-run('Vite build (test mode)', 'npx', ['vite', 'build', '--mode', 'test']);
+run('Next build (test mode)', 'npx', ['next', 'build']);
