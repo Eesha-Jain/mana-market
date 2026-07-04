@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   description:
     'Mana Market — list Magic: The Gathering sealed products on eBay with UPC lookup, OCR photo scan, and pricing tools.',
   icons: {
-    icon: '/logo.svg',
+    icon: '/logo.png',
   },
 };
 

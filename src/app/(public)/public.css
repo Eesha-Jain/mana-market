@@ -1,0 +1,5 @@
+/* Full-bleed public routes (home dragon hero, login, register) */
+.public-shell {
+  width: 100%;
+  min-height: calc(100dvh - 56px);
+}

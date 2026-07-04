@@ -1,5 +1,5 @@
 import { preprocessImageForOcr } from './imagePreprocess';
-import { getAccessToken } from '../lib/supabase';
+import { getAccessToken } from '@/lib/supabase/client';
 import { fetchWithTimeout } from './fetchWithTimeout';
 
 export class OcrError extends Error {

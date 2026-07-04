@@ -11,7 +11,7 @@ import {
   type UserSettings,
 } from '../utils/userSettings';
 import { useAuth } from './AuthContext';
-import { isSupabaseConfigured, getAccessToken } from '../lib/supabase';
+import { isSupabaseConfigured, getAccessToken } from '@/lib/supabase/client';
 import { fetchUserSettingsAction, saveUserSettingsAction } from '@/app/actions/settings';
 
 interface UserSettingsContextType {

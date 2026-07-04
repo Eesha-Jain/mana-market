@@ -3,7 +3,6 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ItemListing, Product } from '@/types';
 import { generateListingId } from '@/types';
-import { createServerSupabase } from '@/lib/supabase/server';
 
 export interface ListingRow {
   id: string;
@@ -195,8 +194,4 @@ export async function deleteAllListings(
 ): Promise<void> {
   const { error } = await supabase.from('listings').delete().eq('user_id', userId);
   assertNoError(error, 'clear listings');
-}
-
-export function createListingsClient(accessToken: string) {
-  return createServerSupabase(accessToken);
 }

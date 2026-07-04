@@ -13,7 +13,7 @@ import type { ItemListing, Product } from '../types';
 import { generateListingId } from '../types';
 import { useAuth } from './AuthContext';
 import { useUserSettings } from './UserSettingsContext';
-import { isSupabaseConfigured, getAccessToken } from '../lib/supabase';
+import { isSupabaseConfigured, getAccessToken } from '@/lib/supabase/client';
 import {
   deleteAllListingsAction,
   deleteListingAction,

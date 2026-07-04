@@ -1,4 +1,4 @@
-import { getSupabase, isSupabaseConfigured, LISTING_IMAGES_BUCKET } from '../lib/supabase';
+import { getSupabase, isSupabaseConfigured, LISTING_IMAGES_BUCKET } from '@/lib/supabase/client';
 
 export { isPersistentImageUrl } from './imageUrl';
 

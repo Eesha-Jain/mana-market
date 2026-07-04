@@ -1,5 +1,5 @@
 import type { Product, MarketPriceSource, PriceRange, ImageCandidate } from '../types';
-import { getAccessToken } from '../lib/supabase';
+import { getAccessToken } from '@/lib/supabase/client';
 import { fetchWithTimeout } from './fetchWithTimeout';
 
 export type BackendSearchResult =
@@ -42,13 +42,6 @@ export async function searchProduct(
 
 export function getProductMarketPrice(product: Product): number | null {
   return product.marketPrice ?? null;
-}
-
-export function getProductImageUrl(
-  product: Product,
-  index = 0,
-): string | null {
-  return product.imageUrls[index] ?? null;
 }
 
 export function formatPrice(price: number | null): string {

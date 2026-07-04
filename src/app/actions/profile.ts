@@ -10,12 +10,3 @@ export async function fetchProfileAction(accessToken: string): Promise<AppUser |
   const supabase = createServerSupabase(accessToken);
   return profilesDb.fetchProfile(supabase, userId);
 }
-
-export async function updateProfileNameAction(
-  accessToken: string,
-  name: string,
-): Promise<void> {
-  const userId = await requireAccessToken(accessToken);
-  const supabase = createServerSupabase(accessToken);
-  await profilesDb.updateProfileName(supabase, userId, name);
-}

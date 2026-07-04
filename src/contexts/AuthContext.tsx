@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-import { getSupabase, getAccessToken, isSupabaseConfigured } from '../lib/supabase';
+import { getSupabase, getAccessToken, isSupabaseConfigured } from '@/lib/supabase/client';
 import type { AppUser } from '../lib/db/profiles';
 import { fetchProfileAction } from '@/app/actions/profile';
 import {

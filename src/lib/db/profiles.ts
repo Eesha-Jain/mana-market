@@ -31,19 +31,3 @@ export async function fetchProfile(
     name: data.name,
   };
 }
-
-export async function updateProfileName(
-  supabase: SupabaseClient,
-  userId: string,
-  name: string,
-): Promise<void> {
-  const { error } = await supabase
-    .from('profiles')
-    .update({ name, updated_at: new Date().toISOString() })
-    .eq('id', userId);
-
-  if (error) {
-    console.error('[supabase] updateProfile', error);
-    throw new Error(error.message || 'Failed to update profile');
-  }
-}

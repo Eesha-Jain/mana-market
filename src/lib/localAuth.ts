@@ -1,5 +1,5 @@
 import type { AppUser } from './db/profiles';
-import { publicEnv } from './env';
+import { publicEnv } from './env/public';
 
 const USERS_KEY = 'mtg_lister_users';
 const SESSION_KEY = 'mtg_lister_session';
