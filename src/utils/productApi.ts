@@ -1,4 +1,5 @@
 import type { Product, MarketPriceSource, PriceRange, ImageCandidate } from '../types';
+import { getAccessToken } from '../lib/supabase';
 import { fetchWithTimeout } from './fetchWithTimeout';
 
 export type BackendSearchResult =
@@ -18,8 +19,13 @@ export async function searchProduct(
   if (sku)   params.set('sku', sku);
 
   try {
+    const token = await getAccessToken();
+    const headers: Record<string, string> = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+
     const res = await fetchWithTimeout(`/api/search?${params}`, {
       timeoutMs: 15_000,
+      headers,
     });
 
     if (!res.ok) {

@@ -1,3 +1,5 @@
+'use client';
+
 import { useItems } from '../contexts/ItemsContext';
 import { useUserSettings } from '../contexts/UserSettingsContext';
 

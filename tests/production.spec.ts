@@ -19,6 +19,12 @@ test.describe('production deployment', () => {
 
   test('search API responds on production', async ({ request }) => {
     const res = await request.get('/api/search?q=Modern+Horizons+3+Booster+Box');
+    // Authenticated when Supabase is configured; unauthenticated calls return 401.
+    if (res.status() === 401) {
+      const json = await res.json();
+      expect(json.error).toBe('Unauthorized');
+      return;
+    }
     expect(res.status(), await res.text()).toBeLessThan(500);
     const json = await res.json();
     expect(json.type).toBeTruthy();

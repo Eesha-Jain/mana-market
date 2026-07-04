@@ -1,4 +1,4 @@
-import type { AppUser } from './supabaseDb';
+import type { AppUser } from './db/profiles';
 import { publicEnv } from './env';
 
 const USERS_KEY = 'mtg_lister_users';

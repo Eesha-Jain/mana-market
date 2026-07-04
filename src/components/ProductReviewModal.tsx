@@ -1,3 +1,5 @@
+'use client';
+
 import { useMemo, useState, useEffect, useRef } from 'react';
 import type { Product, EbayCondition, PricingMode, MarketPricePreference, MarketPriceSource } from '../types';
 import {

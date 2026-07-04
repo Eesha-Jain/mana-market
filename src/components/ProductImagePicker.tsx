@@ -1,3 +1,5 @@
+'use client';
+
 import { useRef, useState, type ChangeEvent } from 'react';
 import type { ImageCandidate, ImageCandidateSource } from '../types';
 import { uploadProductImage } from '../utils/imageUpload';

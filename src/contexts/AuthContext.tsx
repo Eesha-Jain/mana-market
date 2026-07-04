@@ -1,9 +1,9 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-import { getSupabase, isSupabaseConfigured } from '../lib/supabase';
-import type { AppUser } from '../lib/supabaseDb';
-import { fetchProfile } from '../lib/supabaseDb';
+import { getSupabase, getAccessToken, isSupabaseConfigured } from '../lib/supabase';
+import type { AppUser } from '../lib/db/profiles';
+import { fetchProfileAction } from '@/app/actions/profile';
 import {
   isLocalAuthMode,
   loadLocalSession,
@@ -25,7 +25,8 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 async function resolveSupabaseUser(userId: string, email: string | undefined): Promise<User> {
-  const profile = await fetchProfile(userId);
+  const token = await getAccessToken();
+  const profile = token ? await fetchProfileAction(token) : null;
   if (profile) return profile;
 
   const supabase = getSupabase();

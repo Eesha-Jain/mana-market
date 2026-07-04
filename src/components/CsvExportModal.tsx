@@ -1,3 +1,5 @@
+'use client';
+
 import { useState } from 'react';
 import type { ItemListing } from '../types';
 import { CSV_COLUMNS, buildCsvContent, downloadCsv } from '../utils/csvExporter';

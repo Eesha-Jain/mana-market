@@ -13,7 +13,10 @@ dist
 *.local
 
 # Editor directories and files
+.vercel/*
 .vscode/*
+.cursor/*
+
 !.vscode/extensions.json
 .idea
 .DS_Store
@@ -24,9 +27,7 @@ dist
 *.sw?
 
 # Env (keep .env.test for Playwright local-auth builds)
-.env
-.env.local
-.env.*.local
+.env*
 !.env.test
 
 # Vercel — never commit output/ or prebuilt artifacts (breaks deploys)
@@ -36,8 +37,3 @@ dist
 test-results/
 playwright-report/
 *.tsbuildinfo
-
-.cursor/*
-
-.vercel
-.env*

@@ -1,3 +1,5 @@
+'use client';
+
 import type { Product } from '../types';
 import {
   formatPrice,

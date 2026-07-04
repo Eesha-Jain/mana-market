@@ -1,3 +1,5 @@
+'use client';
+
 import type { DefaultSaveOffer } from '../utils/reviewDefaults';
 export type { DefaultSaveOffer } from '../utils/reviewDefaults';
 

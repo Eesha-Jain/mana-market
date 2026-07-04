@@ -1,3 +1,5 @@
+'use client';
+
 import type { EbayCondition } from '../types';
 import { EBAY_CONDITIONS } from '../types';
 

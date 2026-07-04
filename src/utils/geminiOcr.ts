@@ -1,4 +1,5 @@
 import { preprocessImageForOcr } from './imagePreprocess';
+import { getAccessToken } from '../lib/supabase';
 import { fetchWithTimeout } from './fetchWithTimeout';
 
 export class OcrError extends Error {
@@ -35,9 +36,13 @@ async function callOcrApi(
 
   let res: Response;
   try {
+    const token = await getAccessToken();
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = `Bearer ${token}`;
+
     res = await fetchWithTimeout('/api/ocr', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ mode, image: base64, mimeType }),
       timeoutMs: 60_000,
     });

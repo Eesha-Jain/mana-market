@@ -1,4 +1,6 @@
-import { serverEnv } from '@/lib/env';
+import 'server-only';
+
+import { serverEnv } from '@/lib/env/server';
 import { GoogleGenAI } from '@google/genai';
 import {
   OCR_PASS1_PROMPT,

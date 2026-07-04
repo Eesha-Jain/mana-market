@@ -1,3 +1,5 @@
+'use client';
+
 import type { MarketPricePreference, MarketPriceSource, Product } from '../types';
 import { formatPrice, getMarketPriceSourceLabel } from '../utils/productApi';
 import {

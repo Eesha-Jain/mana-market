@@ -1,3 +1,5 @@
+'use client';
+
 import type { Product } from '../types';
 import { formatPrice, getMarketPriceSourceLabel } from '../utils/productApi';
 import { Modal } from './Modal';

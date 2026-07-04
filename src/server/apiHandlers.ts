@@ -1,10 +1,14 @@
+import 'server-only';
+
 import { searchItem } from '@/server/search';
 import {
   extractTextFromImageBase64,
   extractUpcFromImageBase64,
   isGeminiConfigured,
 } from '@/server/ocr';
-import { publicEnv, serverEnv } from '@/lib/env';
+import { requireApiAuth } from '@/lib/auth/server';
+import { publicEnv } from '@/lib/env/public';
+import { serverEnv } from '@/lib/env/server';
 
 export function healthPayload() {
   return {
@@ -20,6 +24,9 @@ export function healthPayload() {
 }
 
 export async function handleSearchGet(request: Request): Promise<Response> {
+  const auth = await requireApiAuth(request);
+  if (auth instanceof Response) return auth;
+
   const url = new URL(request.url);
   const q = url.searchParams.get('q') ?? '';
   const upc = url.searchParams.get('upc') ?? undefined;
@@ -46,6 +53,9 @@ export async function handleSearchGet(request: Request): Promise<Response> {
 }
 
 export async function handleOcrPost(request: Request): Promise<Response> {
+  const auth = await requireApiAuth(request);
+  if (auth instanceof Response) return auth;
+
   if (!isGeminiConfigured()) {
     return Response.json(
       {

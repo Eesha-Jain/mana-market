@@ -2,7 +2,7 @@ const DEFAULT_MAX_EDGE = 1600;
 const JPEG_QUALITY = 0.88;
 
 function ocrMaxEdge(): number {
-  const raw = process.env.NEXT_PUBLIC_GEMINI_OCR_MAX_EDGE ?? process.env.VITE_GEMINI_OCR_MAX_EDGE;
+  const raw = process.env.NEXT_PUBLIC_GEMINI_OCR_MAX_EDGE;
   if (!raw) return DEFAULT_MAX_EDGE;
   const n = parseInt(raw, 10);
   return Number.isFinite(n) && n >= 640 ? n : DEFAULT_MAX_EDGE;

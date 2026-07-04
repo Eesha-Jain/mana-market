@@ -64,7 +64,7 @@ test.describe('listing id helpers', () => {
       query: 'fallback query',
       customTitle: 'Custom Listing Title',
       product: { title: 'Detected Product', description: '', imageUrls: [] },
-    } as import('../src/types').ItemListing;
+    } as unknown as import('../src/types').ItemListing;
 
     expect(getItemTitle(item)).toBe('Custom Listing Title');
     expect(getDetectedTitle(item)).toBe('Detected Product');

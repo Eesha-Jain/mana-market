@@ -1,3 +1,5 @@
+'use client';
+
 import {
   CSV_COLUMN_KEYS,
   CSV_COLUMN_LABELS,

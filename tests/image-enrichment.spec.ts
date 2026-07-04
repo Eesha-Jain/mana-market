@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { searchItem } from '../server/search';
+import { searchItem } from '../src/server/search';
 import { getItemImageUrl, getItemPictureUrls, itemHasListingImage } from '../src/types';
 import { makeReadyItem, MOCK_BOOSTER_BOX } from './helpers/sampleData';
 
@@ -10,7 +10,8 @@ test.describe('search enrichment', () => {
     expect(['found', 'not_found']).toContain(result.type);
     expect(result.missingFields ?? []).toContain('image');
     if (result.type === 'found') {
-      expect(result.product?.imageUrls).toEqual([]);
+      const product = result.product as import('../src/types').Product | undefined;
+      expect(product?.imageUrls).toEqual([]);
     }
   });
 });

@@ -1,4 +1,6 @@
-import { serverEnv } from '@/lib/env';
+import 'server-only';
+
+import { serverEnv } from '@/lib/env/server';
 
 // ─── UPC / Barcode lookup (UPCitemdb — 100/day, no key) ─────────────────────
 

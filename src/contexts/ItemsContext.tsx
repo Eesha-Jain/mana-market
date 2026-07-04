@@ -13,14 +13,14 @@ import type { ItemListing, Product } from '../types';
 import { generateListingId } from '../types';
 import { useAuth } from './AuthContext';
 import { useUserSettings } from './UserSettingsContext';
-import { isSupabaseConfigured } from '../lib/supabase';
+import { isSupabaseConfigured, getAccessToken } from '../lib/supabase';
 import {
-  deleteAllListings,
-  deleteListing,
-  fetchListings,
-  insertListing,
-  updateListing,
-} from '../lib/supabaseDb';
+  deleteAllListingsAction,
+  deleteListingAction,
+  fetchListingsAction,
+  insertListingAction,
+  updateListingAction,
+} from '@/app/actions/listings';
 
 type Action =
   | { type: 'SET_ITEMS'; items: ItemListing[] }
@@ -161,7 +161,11 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
     if (isSupabaseConfigured()) {
       setIsLoading(true);
       setLoadError(null);
-      fetchListings(user.id)
+      void getAccessToken()
+        .then(async token => {
+          if (!token) throw new Error('Not signed in');
+          return fetchListingsAction(token);
+        })
         .then(loaded => dispatchItems({ type: 'SET_ITEMS', items: loaded.map(ensureListingFields) }))
         .catch(err => {
           setLoadError(formatSyncError(err, 'load your listings'));
@@ -201,8 +205,11 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
     const item = makeItem(settings, query, source, overrides);
     dispatchItems({ type: 'ADD_ITEM', item });
     if (user && isSupabaseConfigured()) {
-      void insertListing(item, user.id).catch(err => {
-        setSyncError(formatSyncError(err, 'save listing'));
+      void getAccessToken().then(token => {
+        if (!token) return;
+        void insertListingAction(token, item).catch(err => {
+          setSyncError(formatSyncError(err, 'save listing'));
+        });
       });
     }
     return item;
@@ -214,8 +221,11 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
     queueMicrotask(() => {
       const merged = itemsRef.current.find(i => i.id === id);
       if (merged && user && isSupabaseConfigured()) {
-        void updateListing(merged, user.id).catch(err => {
-          setSyncError(formatSyncError(err, 'update listing'));
+        void getAccessToken().then(token => {
+          if (!token) return;
+          void updateListingAction(token, merged).catch(err => {
+            setSyncError(formatSyncError(err, 'update listing'));
+          });
         });
       }
     });
@@ -224,8 +234,11 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
   const removeItem = (id: string) => {
     dispatchItems({ type: 'REMOVE_ITEM', id });
     if (user && isSupabaseConfigured()) {
-      void deleteListing(id, user.id).catch(err => {
-        setSyncError(formatSyncError(err, 'delete listing'));
+      void getAccessToken().then(token => {
+        if (!token) return;
+        void deleteListingAction(token, id).catch(err => {
+          setSyncError(formatSyncError(err, 'delete listing'));
+        });
       });
     }
   };
@@ -233,8 +246,11 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
   const clearItems = () => {
     dispatchItems({ type: 'CLEAR_ITEMS' });
     if (user && isSupabaseConfigured()) {
-      void deleteAllListings(user.id).catch(err => {
-        setSyncError(formatSyncError(err, 'clear listings'));
+      void getAccessToken().then(token => {
+        if (!token) return;
+        void deleteAllListingsAction(token).catch(err => {
+          setSyncError(formatSyncError(err, 'clear listings'));
+        });
       });
     }
   };

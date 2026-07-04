@@ -11,8 +11,8 @@ import {
   type UserSettings,
 } from '../utils/userSettings';
 import { useAuth } from './AuthContext';
-import { isSupabaseConfigured } from '../lib/supabase';
-import { fetchUserSettings, saveUserSettings } from '../lib/supabaseDb';
+import { isSupabaseConfigured, getAccessToken } from '../lib/supabase';
+import { fetchUserSettingsAction, saveUserSettingsAction } from '@/app/actions/settings';
 
 interface UserSettingsContextType {
   settings: UserSettings;
@@ -91,7 +91,11 @@ export function UserSettingsProvider({ children }: { children: ReactNode }) {
     setLoadError(null);
 
     if (isSupabaseConfigured()) {
-      fetchUserSettings(user.id)
+      void getAccessToken()
+        .then(async token => {
+          if (!token) throw new Error('Not signed in');
+          return fetchUserSettingsAction(token);
+        })
         .then(loaded => {
           if (dirtyRef.current) return;
           setSettings(loaded ?? DEFAULT_USER_SETTINGS);
@@ -114,8 +118,11 @@ export function UserSettingsProvider({ children }: { children: ReactNode }) {
     if (!user || !hydratedRef.current) return;
 
     if (isSupabaseConfigured()) {
-      void saveUserSettings(user.id, settings).catch(err => {
-        setSyncError(formatSyncError(err, 'save settings'));
+      void getAccessToken().then(token => {
+        if (!token) return;
+        void saveUserSettingsAction(token, settings).catch(err => {
+          setSyncError(formatSyncError(err, 'save settings'));
+        });
       });
       return;
     }

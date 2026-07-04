@@ -1,3 +1,5 @@
+'use client';
+
 import type { ReactNode } from 'react';
 import { applyTextCase, TEXT_CASE_TOOLBAR, type TextCaseFormat } from '../utils/textCase';
 

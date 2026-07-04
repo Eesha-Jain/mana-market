@@ -1,3 +1,5 @@
+'use client';
+
 import {
   PHOTO_CAPTURE_TARGET_OPTIONS,
   type PhotoCaptureTarget,

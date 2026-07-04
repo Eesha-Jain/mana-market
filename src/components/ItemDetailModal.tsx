@@ -1,3 +1,5 @@
+'use client';
+
 import type { ItemListing } from '../types';
 import { getItemImageUrl, getItemTitle, getDetectedTitle, hasCustomTitle, getItemListingDescription, patchItemListingDescription, itemHasListingImage } from '../types';
 import { resolveItemProductType } from '../utils/productType';

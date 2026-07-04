@@ -1,3 +1,5 @@
+'use client';
+
 import type { PricingMode } from '../types';
 import { formatPrice } from '../utils/productApi';
 
