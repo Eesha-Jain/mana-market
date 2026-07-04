@@ -45,7 +45,7 @@ export async function persistPhotoScanImage(
 export async function uploadProductImage(file: File): Promise<string> {
   if (!isSupabaseConfigured()) {
     throw new Error(
-      'Supabase is not configured. Set NEXT_APP_SUPABASE_URL and NEXT_APP_SUPABASE_ANON_KEY to upload images.',
+      'Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to upload images.',
     );
   }
 

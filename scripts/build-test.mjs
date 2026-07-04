@@ -4,8 +4,8 @@ import { spawnSync } from 'node:child_process';
 
 const env = {
   ...process.env,
-  NEXT_APP_SUPABASE_URL: '',
-  NEXT_APP_SUPABASE_ANON_KEY: '',
+  NEXT_PUBLIC_SUPABASE_URL: '',
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: '',
 };
 
 function run(label, command, args) {
