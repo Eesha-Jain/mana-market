@@ -2,14 +2,17 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { SITE_NAME } from '@/brand';
+import { logout } from '@/lib/auth/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useItems } from '@/contexts/ItemsContext';
+import { BrandLogo } from '@/components/ui/BrandLogo';
+import { BrandWordmark } from '@/components/ui/BrandWordmark';
 import { getExportableItems } from '@/utils/ebayMapper';
 import { isItemPending } from '@/utils/itemStatus';
-import { BrandLink } from '@/components/ui/BrandLink';
 
 export function Navbar() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { items } = useItems();
   const pathname = usePathname();
 
@@ -18,7 +21,10 @@ export function Navbar() {
 
   return (
     <nav className="navbar">
-      <BrandLink />
+      <Link href="/" className="navbar-brand" aria-label={SITE_NAME}>
+        <BrandLogo variant="nav" decorative />
+        <BrandWordmark />
+      </Link>
 
       {user && (
         <div className="navbar-links">

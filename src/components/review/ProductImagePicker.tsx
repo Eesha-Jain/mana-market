@@ -24,6 +24,7 @@ interface ProductImagePickerProps {
   onChange: (selection: ProductImageSelection) => void;
   alt?: string;
   emptyMessage?: string;
+  readOnly?: boolean;
 }
 
 function dedupeCandidates(candidates: ImageCandidate[]): ImageCandidate[] {
@@ -70,6 +71,7 @@ export function ProductImagePicker({
   onChange,
   alt = 'Product',
   emptyMessage = 'No image found online — upload your own',
+  readOnly = false,
 }: ProductImagePickerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const toast = useToast();
@@ -128,7 +130,7 @@ export function ProductImagePicker({
         </div>
       )}
 
-      {allCandidates.length > 0 && (
+      {allCandidates.length > 0 && !readOnly && (
         <div className="product-image-picker-candidates">
           <span className="product-image-picker-label">Choose an image</span>
           <div className="product-image-picker-grid">
@@ -154,6 +156,7 @@ export function ProductImagePicker({
         </div>
       )}
 
+      {!readOnly && (
       <div className="product-image-picker-actions">
         <input
           ref={fileInputRef}
@@ -171,6 +174,7 @@ export function ProductImagePicker({
           {uploading ? 'Uploading…' : heroUrl ? 'Upload different image' : 'Upload your own'}
         </button>
       </div>
+      )}
     </section>
   );
 }

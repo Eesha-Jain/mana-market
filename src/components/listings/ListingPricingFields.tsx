@@ -12,6 +12,7 @@ interface ListingPricingFieldsProps {
   onPricingModeChange: (mode: PricingMode) => void;
   onPercentBelowChange: (value: number) => void;
   onManualPriceChange: (value: number) => void;
+  readOnly?: boolean;
 }
 
 export function ListingPricingFields({
@@ -23,7 +24,23 @@ export function ListingPricingFields({
   onPricingModeChange,
   onPercentBelowChange,
   onManualPriceChange,
+  readOnly = false,
 }: ListingPricingFieldsProps) {
+  if (readOnly) {
+    return (
+      <div className="detail-price-summary detail-price-summary--readonly">
+        <div>
+          <span className="text-muted text-sm">Market price</span>
+          <strong>{marketPrice != null ? formatPrice(marketPrice) : '—'}</strong>
+        </div>
+        <div>
+          <span className="text-muted text-sm">Your list price</span>
+          <strong>{finalPrice !== null ? `$${finalPrice.toFixed(2)}` : '—'}</strong>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <label className="detail-field">

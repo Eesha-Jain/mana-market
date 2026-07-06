@@ -5,7 +5,8 @@ import type { Product, EbayCondition } from '@/types';
 import { toastReviewMessage, useToast } from '@/contexts/ToastContext';
 import { BatchProgressBanner } from './BatchProgressBanner';
 import { AmbiguousModal } from './AmbiguousModal';
-import { ProductReviewModal } from './ProductReviewModal';
+import { ItemModal } from '@/components/listings/ItemModal';
+import { Modal } from '@/components/ui/Modal';
 import {
   needsProductDisambiguation,
   withSelectedProduct,
@@ -76,8 +77,18 @@ export function ProductReviewFlow({
     return (
       <>
         {batchBanner}
-        <div className="modal-overlay modal-overlay--entry-review" role="status" aria-live="polite">
-        <div className="modal modal--compact product-review-loading">
+        <Modal
+          compact
+          hideHeader
+          hideClose
+          bareBody
+          closeOnOverlayClick={false}
+          overlayClassName="modal-overlay--entry-review"
+          overlayRole="status"
+          overlayAriaLive="polite"
+          className="product-review-loading"
+          onClose={onClose}
+        >
           <div className="spinner" />
           <p>{loadingMessage}</p>
           {showLoadingExit && (
@@ -94,8 +105,7 @@ export function ProductReviewFlow({
               )}
             </div>
           )}
-        </div>
-      </div>
+        </Modal>
       </>
     );
   }
@@ -133,7 +143,8 @@ export function ProductReviewFlow({
   return (
     <>
       {batchBanner}
-      <ProductReviewModal
+      <ItemModal
+      mode="review"
       key={`${activeData.variant}-${activeData.searchQuery}-${matchedProduct?.title ?? 'manual'}`}
       data={activeData}
       matchedProduct={matchedProduct}

@@ -25,6 +25,7 @@ export interface ListingRow {
   market_price_preference: string | null;
   selected_market_price_source: string | null;
   notes: string;
+  listed_externally: boolean | null;
   ebay_exported_at: string | null;
   ebay_listing_status: string | null;
   ebay_listing_url: string | null;
@@ -64,6 +65,7 @@ export function rowToListing(row: ListingRow): ItemListing {
     marketPricePreference: (row.market_price_preference as ItemListing['marketPricePreference']) ?? undefined,
     selectedMarketPriceSource: (row.selected_market_price_source as ItemListing['selectedMarketPriceSource']) ?? undefined,
     notes: row.notes,
+    listedExternally: row.listed_externally ?? undefined,
     ebayExportedAt: row.ebay_exported_at ?? undefined,
     ebayListingStatus: (row.ebay_listing_status as ItemListing['ebayListingStatus']) ?? undefined,
     ebayListingUrl: row.ebay_listing_url ?? undefined,
@@ -98,6 +100,7 @@ function listingToRow(item: ItemListing, userId: string): ListingRow {
     market_price_preference: item.marketPricePreference ?? null,
     selected_market_price_source: item.selectedMarketPriceSource ?? null,
     notes: item.notes,
+    listed_externally: item.listedExternally ?? null,
     ebay_exported_at: item.ebayExportedAt ?? null,
     ebay_listing_status: item.ebayListingStatus ?? null,
     ebay_listing_url: item.ebayListingUrl ?? null,
@@ -130,6 +133,7 @@ function listingToUpdatePayload(item: ItemListing) {
     market_price_preference: item.marketPricePreference ?? null,
     selected_market_price_source: item.selectedMarketPriceSource ?? null,
     notes: item.notes,
+    listed_externally: item.listedExternally ?? null,
     ebay_exported_at: item.ebayExportedAt ?? null,
     ebay_listing_status: item.ebayListingStatus ?? null,
     ebay_listing_url: item.ebayListingUrl ?? null,

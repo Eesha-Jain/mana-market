@@ -135,6 +135,7 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(false);
   const itemsRef = useRef(items);
   itemsRef.current = items;
+  const syncTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   const dispatchItems = useCallback((action: Action) => {
     setItems(prev => {
@@ -185,6 +186,14 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
   }, [user?.id, dispatchItems, toast]);
 
   useEffect(() => {
+    const timers = syncTimersRef.current;
+    return () => {
+      timers.forEach(timer => clearTimeout(timer));
+      timers.clear();
+    };
+  }, []);
+
+  useEffect(() => {
     if (!user || isSupabaseConfigured()) return;
     localStorage.setItem(localStorageKey(user.id), JSON.stringify(items));
   }, [items, user?.id]);
@@ -210,17 +219,25 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
   const updateItem = (id: string, updates: Partial<ItemListing>) => {
     dispatchItems({ type: 'UPDATE_ITEM', id, updates });
 
-    queueMicrotask(() => {
-      const merged = itemsRef.current.find(i => i.id === id);
-      if (merged && user && isSupabaseConfigured()) {
+    if (!user || !isSupabaseConfigured()) return;
+
+    const existingTimer = syncTimersRef.current.get(id);
+    if (existingTimer) clearTimeout(existingTimer);
+
+    syncTimersRef.current.set(
+      id,
+      setTimeout(() => {
+        syncTimersRef.current.delete(id);
+        const merged = itemsRef.current.find(i => i.id === id);
+        if (!merged) return;
         void getAccessToken().then(token => {
           if (!token) return;
           void updateListingAction(token, merged).catch(err => {
             toast.error(formatSyncError(err, 'update listing'));
           });
         });
-      }
-    });
+      }, 400),
+    );
   };
 
   const removeItem = (id: string) => {

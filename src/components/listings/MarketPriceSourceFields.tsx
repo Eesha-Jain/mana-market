@@ -16,6 +16,7 @@ interface MarketPriceSourceFieldsProps {
   onPreferenceChange: (preference: MarketPricePreference) => void;
   onSelectedSourceChange: (source: MarketPriceSource) => void;
   compact?: boolean;
+  readOnly?: boolean;
 }
 
 export function MarketPriceSourceFields({
@@ -25,11 +26,23 @@ export function MarketPriceSourceFields({
   onPreferenceChange,
   onSelectedSourceChange,
   compact = false,
+  readOnly = false,
 }: MarketPriceSourceFieldsProps) {
+  const active = resolveProductMarketSelection(product, preference, selectedSource);
+
+  if (readOnly) {
+    if (!active.source && active.price == null) return null;
+    return (
+      <p className="market-price-source-active text-muted text-sm">
+        Market from {getMarketPriceSourceLabel(active.source ?? undefined, 'short')}
+        {active.price != null ? ` · ${formatPrice(active.price)}` : ''}
+      </p>
+    );
+  }
+
   const options = getMarketPriceOptions(product);
   if (!options.length) return null;
 
-  const active = resolveProductMarketSelection(product, preference, selectedSource);
   const showPicker = shouldShowMarketPricePicker(product, preference);
 
   return (

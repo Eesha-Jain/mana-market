@@ -12,12 +12,12 @@ import {
   isItemNotFound,
   isItemPending,
 } from '@/utils/itemStatus';
-import { ItemDetailModal } from '@/components/listings/ItemDetailModal';
+import { ItemModal } from '@/components/listings/ItemModal';
 import { ItemsTable } from '@/components/listings/ItemsTable';
 
 export default function Page() {
   const { user } = useAuth();
-  const { items, removeItem, clearItems, updateItem } = useItems();
+  const { items, removeItem, clearItems } = useItems();
   const [detailItem, setDetailItem] = useState<string | null>(null);
 
   const found = items.filter(i => isItemReady(i));
@@ -100,9 +100,10 @@ export default function Page() {
       )}
 
       {selectedItem && (
-        <ItemDetailModal
+        <ItemModal
+          key={selectedItem.id}
+          mode="detail"
           item={selectedItem}
-          onUpdate={updates => updateItem(selectedItem.id, updates)}
           onClose={() => setDetailItem(null)}
         />
       )}

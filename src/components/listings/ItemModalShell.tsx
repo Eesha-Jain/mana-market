@@ -9,15 +9,16 @@ import type {
   MarketPricePreference,
   MarketPriceSource,
 } from '@/types';
-import { EBAY_CONDITIONS } from '@/types';
+import { Modal } from '@/components/ui/Modal';
 import { LabeledFieldWithCase } from '@/components/ui/CaseFormatToolbar';
-import { ListingPricingFields } from './ListingPricingFields';
-import { MarketPriceSourceFields } from './MarketPriceSourceFields';
 import {
   ProductImagePicker,
   type ProductImageSelection,
 } from '@/components/review/ProductImagePicker';
 import type { TextCaseFormat } from '@/utils/textCase';
+import { ConditionQuantityFields } from './ConditionQuantityFields';
+import { ListingPricingFields } from './ListingPricingFields';
+import { MarketPriceSourceFields } from './MarketPriceSourceFields';
 
 export interface BatchProgress {
   current: number;
@@ -25,7 +26,7 @@ export interface BatchProgress {
   remaining?: number;
 }
 
-interface ListingEditorModalUIProps {
+export interface ItemModalShellProps {
   overlayClassName?: string;
   modalClassName?: string;
   layout?: 'stacked' | 'split';
@@ -48,6 +49,8 @@ interface ListingEditorModalUIProps {
   afterForm?: ReactNode;
 
   formSectionTitle?: string;
+  readOnly?: boolean;
+
   titleValue: string;
   onTitleChange: (value: string) => void;
   titlePlaceholder?: string;
@@ -63,10 +66,6 @@ interface ListingEditorModalUIProps {
   onDescriptionFormatted?: () => void;
   onDescriptionFormatSelect?: (format: TextCaseFormat) => void;
 
-  sellerNotesValue?: string;
-  onSellerNotesChange?: (value: string) => void;
-
-  /** Override the default condition/quantity row (used by ItemDetailModal). */
   conditionQuantitySection?: ReactNode;
 
   condition?: EbayCondition | null;
@@ -92,6 +91,13 @@ interface ListingEditorModalUIProps {
   onPercentBelowChange: (value: number) => void;
   onManualPriceChange: (value: number) => void;
 
+  listedToggle?: {
+    checked: boolean;
+    onChange: (checked: boolean) => void;
+  };
+
+  onDelete?: () => void;
+
   footerBefore?: ReactNode;
   footerAfter?: ReactNode;
   secondaryLabel: string;
@@ -101,7 +107,7 @@ interface ListingEditorModalUIProps {
   afterModal?: ReactNode;
 }
 
-export function ListingEditorModalUI({
+export function ItemModalShell({
   overlayClassName = '',
   modalClassName = '',
   layout = 'stacked',
@@ -120,6 +126,7 @@ export function ListingEditorModalUI({
   beforeForm,
   afterForm,
   formSectionTitle = 'Listing details',
+  readOnly = false,
   titleValue,
   onTitleChange,
   titlePlaceholder,
@@ -133,8 +140,6 @@ export function ListingEditorModalUI({
   descriptionHint,
   onDescriptionFormatted,
   onDescriptionFormatSelect,
-  sellerNotesValue,
-  onSellerNotesChange,
   conditionQuantitySection,
   condition = null,
   quantity = 1,
@@ -155,6 +160,8 @@ export function ListingEditorModalUI({
   onPricingModeChange,
   onPercentBelowChange,
   onManualPriceChange,
+  listedToggle,
+  onDelete,
   footerBefore,
   footerAfter,
   secondaryLabel,
@@ -162,7 +169,7 @@ export function ListingEditorModalUI({
   primaryLabel,
   onPrimary,
   afterModal,
-}: ListingEditorModalUIProps) {
+}: ItemModalShellProps) {
   const formFields = (
     <div className="item-detail-form">
       <LabeledFieldWithCase
@@ -174,10 +181,11 @@ export function ListingEditorModalUI({
         onFormatted={onTitleFormatted}
         onFormatSelect={onTitleFormatSelect}
         hint={titleHint}
+        readOnly={readOnly}
       />
 
       <LabeledFieldWithCase
-        label={sellerNotesValue !== undefined ? 'Description' : 'Listing description'}
+        label="Description"
         multiline
         rows={5}
         placeholder={descriptionPlaceholder}
@@ -186,58 +194,24 @@ export function ListingEditorModalUI({
         onFormatted={onDescriptionFormatted}
         onFormatSelect={onDescriptionFormatSelect}
         hint={descriptionHint}
+        readOnly={readOnly}
       />
 
-      {sellerNotesValue !== undefined && onSellerNotesChange && (
-        <LabeledFieldWithCase
-          label="Seller notes"
-          multiline
-          rows={3}
-          placeholder="SKU, internal notes, or other seller-only details…"
-          value={sellerNotesValue}
-          onChange={onSellerNotesChange}
-        />
-      )}
-
       {conditionQuantitySection ?? (
-        <div className="photo-review-field-row">
-          <label className="detail-field">
-            <span>Condition <span className="required-mark">*</span></span>
-            <select
-              className="detail-input"
-              value={condition ?? ''}
-              onChange={e =>
-                onConditionChange?.(
-                  e.target.value ? (e.target.value as EbayCondition) : null,
-                )
-              }
-            >
-              <option value="">— Select condition —</option>
-              {EBAY_CONDITIONS.map(c => (
-                <option key={c.id} value={c.label} title={c.mtgEquivalent}>
-                  {`${c.label} (${c.mtgEquivalent})`}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="detail-field">
-            <span>Quantity</span>
-            <input
-              type="number"
-              className="detail-input"
-              min={1}
-              max={999}
-              value={quantity}
-              onChange={e =>
-                onQuantityChange?.(Math.max(1, parseInt(e.target.value, 10) || 1))
-              }
-            />
-          </label>
-        </div>
+        onConditionChange &&
+        onQuantityChange && (
+          <ConditionQuantityFields
+            condition={condition}
+            quantity={quantity}
+            onConditionChange={onConditionChange}
+            onQuantityChange={onQuantityChange}
+            readOnly={readOnly}
+          />
+        )
       )}
 
       {batchProgress &&
+        !readOnly &&
         (batchProgress.remaining ?? 0) > 0 &&
         condition &&
         onApplyConditionToRemaining && (
@@ -259,6 +233,7 @@ export function ListingEditorModalUI({
         selectedSource={selectedMarketPriceSource}
         onPreferenceChange={onMarketPricePreferenceChange}
         onSelectedSourceChange={onSelectedMarketPriceSourceChange}
+        readOnly={readOnly}
       />
 
       <ListingPricingFields
@@ -270,7 +245,26 @@ export function ListingEditorModalUI({
         onPricingModeChange={onPricingModeChange}
         onPercentBelowChange={onPercentBelowChange}
         onManualPriceChange={onManualPriceChange}
+        readOnly={readOnly}
       />
+
+      {listedToggle && (
+        <label className="detail-field listing-listed-toggle">
+          <span className="listing-listed-toggle-label">
+            <input
+              type="checkbox"
+              checked={listedToggle.checked}
+              onChange={e => listedToggle.onChange(e.target.checked)}
+            />
+            Listed on eBay?
+          </span>
+          <span className="text-muted text-sm">
+            {listedToggle.checked
+              ? 'This listing is treated as live on eBay. Uncheck to edit details again.'
+              : 'Check when the item is live on eBay (including if you listed it outside this app).'}
+          </span>
+        </label>
+      )}
 
       {afterForm}
     </div>
@@ -284,82 +278,89 @@ export function ListingEditorModalUI({
         selection={imageSelection}
         onChange={onImageChange}
         alt={imageAlt}
+        readOnly={readOnly}
       />
       {mediaAside}
     </>
   );
 
-  return (
-    <div
-      className={`modal-overlay${overlayClassName ? ` ${overlayClassName}` : ''}`}
-      onClick={onClose}
-    >
-      <div
-        className={`modal modal--wide item-detail-modal${modalClassName ? ` ${modalClassName}` : ''}`}
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="modal-header photo-review-header">
-          <div className="photo-review-header-text">
-            <div className="photo-review-title-row">
-              <h2 className="modal-title">{title}</h2>
-              {batchProgress && batchProgress.total > 1 && (
-                <span className="photo-review-batch-badge">
-                  {batchProgress.current}/{batchProgress.total}
-                </span>
-              )}
-            </div>
-            {subtitle && (
-              <p className="modal-subtitle photo-review-subtitle">{subtitle}</p>
-            )}
+  const bodyContent = (
+    <>
+      {beforeBody}
+
+      {layout === 'split' ? (
+        <div className="item-detail-layout">
+          <div className="item-detail-media">{imageBlock}</div>
+          <div>
+            <h3 className="item-detail-section-title">{formSectionTitle}</h3>
+            {beforeForm}
+            {formFields}
           </div>
-          <button className="modal-close" onClick={onClose} aria-label="Close">✕</button>
         </div>
+      ) : (
+        <>
+          {imageBlock}
+          {beforeForm}
+          <section className="photo-review-section photo-review-form">
+            <h3 className="item-detail-section-title">{formSectionTitle}</h3>
+            {formFields}
+          </section>
+        </>
+      )}
+    </>
+  );
 
-        <div className="modal-body item-detail-body photo-review-body">
-          {beforeBody}
-
-          {layout === 'split' ? (
-            <div className="item-detail-layout">
-              <div className="item-detail-media">{imageBlock}</div>
-              <div>
-                <h3 className="item-detail-section-title">{formSectionTitle}</h3>
-                {beforeForm}
-                {formFields}
-              </div>
-            </div>
-          ) : (
-            <>
-              {imageBlock}
-              {beforeForm}
-              <section className="photo-review-section photo-review-form">
-                <h3 className="item-detail-section-title">{formSectionTitle}</h3>
-                {formFields}
-              </section>
-            </>
-          )}
-        </div>
-
-        <div className="modal-footer photo-review-footer">
-          {footerBefore}
-          {batchProgress && batchProgress.total > 1 && (
-            <span className="photo-batch-footer-progress photo-batch-footer-progress--desktop">
-              {batchLabel} {batchProgress.current} of {batchProgress.total}
-            </span>
-          )}
-          <button type="button" className="btn-ghost" onClick={onSecondary}>
-            {secondaryLabel}
+  const footerContent = (
+    <>
+      {footerBefore}
+      {onDelete && (
+        <button type="button" className="btn-danger btn-ghost" onClick={onDelete}>
+          Delete
+        </button>
+      )}
+      <div className="modal-footer-actions">
+        {batchProgress && batchProgress.total > 1 && (
+          <span className="photo-batch-footer-progress photo-batch-footer-progress--desktop">
+            {batchLabel} {batchProgress.current} of {batchProgress.total}
+          </span>
+        )}
+        <button type="button" className="btn-ghost" onClick={onSecondary}>
+          {secondaryLabel}
+        </button>
+        {primaryLabel && onPrimary && (
+          <button type="button" className="btn-primary" onClick={onPrimary}>
+            {primaryLabel}
           </button>
-          {primaryLabel && onPrimary && (
-            <button type="button" className="btn-primary" onClick={onPrimary}>
-              {primaryLabel}
-            </button>
-          )}
-        </div>
-
-        {footerAfter}
+        )}
       </div>
+    </>
+  );
 
-      {afterModal}
-    </div>
+  return (
+    <Modal
+      wide
+      overlayClassName={overlayClassName}
+      className={`item-detail-modal${modalClassName ? ` ${modalClassName}` : ''}`}
+      headerClassName="photo-review-header"
+      headerInnerClassName="photo-review-header-text"
+      subtitleClassName="photo-review-subtitle"
+      title={title}
+      subtitle={subtitle}
+      titleExtra={
+        batchProgress && batchProgress.total > 1 ? (
+          <span className="photo-review-batch-badge">
+            {batchProgress.current}/{batchProgress.total}
+          </span>
+        ) : undefined
+      }
+      bodyClassName="item-detail-body photo-review-body"
+      footerClassName="photo-review-footer"
+      footer={footerContent}
+      footerAfter={footerAfter}
+      afterPanel={afterModal}
+      onClose={onClose}
+    >
+      {bodyContent}
+    </Modal>
   );
 }

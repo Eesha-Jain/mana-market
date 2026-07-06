@@ -20,10 +20,9 @@ import { PhotoScanTab } from '@/components/upload/PhotoScanTab';
 import { ProductReviewFlow } from '@/components/review/ProductReviewFlow';
 import { ItemsTable } from '@/components/listings/ItemsTable';
 import { TabBar } from '@/components/ui/TabBar';
-import { SingleEntryPanel } from '@/components/upload/SingleEntryPanel';
-import { BulkEntryPanel } from '@/components/upload/BulkEntryPanel';
+import { ManualEntryPanel } from '@/components/upload/ManualEntryPanel';
 import { CsvImportPanel, type CsvPreviewRow } from '@/components/upload/CsvImportPanel';
-import { UPLOAD_TABS, type UploadTabId } from '@/components/upload/uploadTabs';
+import { UPLOAD_TABS, type UploadTabId } from '@/utils/uploadTabs';
 import { buildEntryDraft, type EntryReviewDraft } from '@/utils/entryReview';
 import {
   buildEntryProductReviewData,
@@ -159,7 +158,6 @@ export default function Page() {
       manualPrice: payload.manualPrice,
       marketPricePreference: payload.marketPricePreference,
       selectedMarketPriceSource: payload.selectedMarketPriceSource,
-      notes: payload.notes,
       photoUrl: payload.photoUrl,
       userImageUrl: payload.userImageUrl,
       preferredImageSource: payload.preferredImageSource,
@@ -347,7 +345,8 @@ export default function Page() {
 
   const tabPanels: Record<UploadTabId, ReactNode> = {
     single: (
-      <SingleEntryPanel
+      <ManualEntryPanel
+        mode="single"
         value={manualInput}
         onChange={setManualInput}
         onSubmit={handleReviewSingle}
@@ -355,7 +354,8 @@ export default function Page() {
       />
     ),
     bulk: (
-      <BulkEntryPanel
+      <ManualEntryPanel
+        mode="bulk"
         value={bulkText}
         onChange={setBulkText}
         onSubmit={handleReviewBulk}

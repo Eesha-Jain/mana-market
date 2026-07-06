@@ -1,6 +1,7 @@
 import type { ItemListing, EbayListingPayload } from '../types';
 import { EBAY_CONDITIONS, getItemTitle, getItemListingDescription, getItemPictureUrls } from '../types';
 import { isItemFound } from './itemStatus';
+import { isItemListingLocked } from './listingLock';
 import { resolveItemMarketPrice } from './marketPrice';
 import { resolveItemProductType } from './productType';
 import { calculateDraftPrice } from './pricing';
@@ -97,7 +98,7 @@ export function isItemReady(item: ItemListing): boolean {
 }
 
 export function isItemOnEbay(item: ItemListing): boolean {
-  return !!item.ebayExportedAt;
+  return isItemListingLocked(item);
 }
 
 /** User-provided live listing URL, when set. */

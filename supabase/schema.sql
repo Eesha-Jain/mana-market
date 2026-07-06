@@ -195,6 +195,7 @@ create table if not exists public.listings (
   market_price_preference text,
   selected_market_price_source text,
   notes text not null default '',
+  listed_externally boolean not null default false,
   ebay_exported_at timestamptz,
   ebay_listing_status text,
   ebay_listing_url text,
@@ -515,3 +516,6 @@ alter table public.user_settings
 alter table public.listings
   alter column status type public.item_status
     using status::public.item_status;
+
+alter table public.listings
+  add column if not exists listed_externally boolean not null default false;

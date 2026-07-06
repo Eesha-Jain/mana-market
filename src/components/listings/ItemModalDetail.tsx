@@ -1,8 +1,8 @@
 'use client';
 
-import type { EbayCondition, ItemListing } from '@/types';
+import { useEffect, useMemo, useState } from 'react';
+import type { ItemListing } from '@/types';
 import {
-  EBAY_CONDITIONS,
   getItemImageUrl,
   getItemTitle,
   getDetectedTitle,
@@ -15,47 +15,47 @@ import { resolveItemProductType } from '@/utils/productType';
 import { getMarketPriceSourceLabel } from '@/utils/productApi';
 import {
   calculatePrice,
+  EBAY_SELLER_ACTIVE_LISTINGS_URL,
   getEbayListingUrl,
   getItemMarketPrice,
-  buildEbayListing,
 } from '@/utils/ebayMapper';
 import { resolveItemMarketSelection } from '@/utils/marketPrice';
 import { getItemStatusLabel, isItemAmbiguous } from '@/utils/itemStatus';
+import {
+  isItemListingLocked,
+  isListedToggleOn,
+  listingListedToggleUpdates,
+} from '@/utils/listingLock';
 import { ProductExternalLinks } from '@/components/review/ProductExternalLinks';
 import { collectReviewImageCandidates } from '@/utils/productReview';
 import type { ProductImageSelection } from '@/components/review/ProductImagePicker';
-import { ListingEditorModalUI } from './ListingEditorModalUI';
-import { useMemo, useState } from 'react';
+import { useItems } from '@/contexts/ItemsContext';
+import { ConditionQuantityFields } from './ConditionQuantityFields';
+import { ItemModalShell } from './ItemModalShell';
 
-interface ItemDetailModalProps {
+export interface ItemModalDetailProps {
+  mode: 'detail';
   item: ItemListing;
-  onUpdate: (updates: Partial<ItemListing>) => void;
   onClose: () => void;
   onResolveAmbiguous?: () => void;
 }
 
-/**
- * Full-screen editor for a single queue item (dashboard / review pages).
- * Renders shared listing UI via ListingEditorModalUI; this file owns
- * item-specific data wiring and the left-column product metadata panel.
- */
-export function ItemDetailModal({
+export function ItemModalDetail({
   item,
-  onUpdate,
   onClose,
   onResolveAmbiguous,
-}: ItemDetailModalProps) {
+}: Omit<ItemModalDetailProps, 'mode'>) {
+  const { updateItem, removeItem } = useItems();
   const product = item.product;
+  const readOnly = isItemListingLocked(item);
 
-  // ── Derived listing values (pricing, export payload, catalog metadata) ──────
   const img = getItemImageUrl(item);
   const market = getItemMarketPrice(item);
   const marketSelection = resolveItemMarketSelection(item);
   const yourPrice = calculatePrice(item);
-  const payload = buildEbayListing(item);
   const productType = resolveItemProductType(item);
+  const ebayUrl = getEbayListingUrl(item);
 
-  // Image picker needs the same candidate list used during intake review.
   const imageCandidates = useMemo(
     () => collectReviewImageCandidates(
       {
@@ -79,14 +79,23 @@ export function ItemDetailModal({
     [item, product],
   );
 
-  // Local mirror of image selection so the picker stays responsive before onUpdate persists.
   const [imageSelection, setImageSelection] = useState<ProductImageSelection>(() => ({
     selectedUrl: img,
     userImageUrl: item.userImageUrl,
     preferredImageSource: item.preferredImageSource ?? (item.userImageUrl ? 'user' : 'catalog'),
   }));
 
+  useEffect(() => {
+    const nextImg = getItemImageUrl(item);
+    setImageSelection({
+      selectedUrl: nextImg,
+      userImageUrl: item.userImageUrl,
+      preferredImageSource: item.preferredImageSource ?? (item.userImageUrl ? 'user' : 'catalog'),
+    });
+  }, [item.id, item.userImageUrl, item.preferredImageSource, item.product?.imageUrls]);
+
   const applyImageSelection = (selection: ProductImageSelection) => {
+    if (readOnly) return;
     setImageSelection(selection);
 
     const updates: Partial<ItemListing> = {
@@ -104,51 +113,20 @@ export function ItemDetailModal({
       };
     }
 
-    onUpdate(updates);
+    updateItem(item.id, updates);
   };
 
-  // ── Condition & quantity (stacked layout for the detail split column) ───────
   const conditionQuantitySection = (
-    <div className="condition-quantity-stack">
-      <label className="detail-field">
-        <span>Condition <span className="required-mark">*</span></span>
-        <select
-          className="detail-input"
-          value={item.condition ?? ''}
-          onChange={e =>
-            onUpdate({
-              condition: e.target.value
-                ? (e.target.value as EbayCondition)
-                : null,
-            })
-          }
-        >
-          <option value="">— Select condition —</option>
-          {EBAY_CONDITIONS.map(c => (
-            <option key={c.id} value={c.label} title={c.mtgEquivalent}>
-              {`${c.label} (${c.mtgEquivalent})`}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <label className="detail-field">
-        <span>Quantity</span>
-        <input
-          type="number"
-          className="detail-input"
-          min={1}
-          max={999}
-          value={item.quantity}
-          onChange={e =>
-            onUpdate({ quantity: Math.max(1, parseInt(e.target.value, 10) || 1) })
-          }
-        />
-      </label>
-    </div>
+    <ConditionQuantityFields
+      layout="stack"
+      condition={item.condition}
+      quantity={item.quantity}
+      readOnly={readOnly}
+      onConditionChange={condition => updateItem(item.id, { condition })}
+      onQuantityChange={quantity => updateItem(item.id, { quantity })}
+    />
   );
 
-  // ── Left column: read-only catalog info + ambiguous-match action ──────────
   const mediaAside = (
     <>
       {product && (
@@ -190,7 +168,7 @@ export function ItemDetailModal({
         </div>
       )}
 
-      {isItemAmbiguous(item) && onResolveAmbiguous && (
+      {isItemAmbiguous(item) && onResolveAmbiguous && !readOnly && (
         <button className="btn-primary btn-sm" onClick={onResolveAmbiguous}>
           Select from matches →
         </button>
@@ -198,80 +176,62 @@ export function ItemDetailModal({
     </>
   );
 
-  // ── Post-pricing extras: export tracking and raw eBay JSON preview ────────
-  const afterForm = (
-    <>
-      {item.ebayExportedAt && (
-        <div className="ebay-status-box">
-          <strong>Exported to eBay</strong>
-          <p className="text-muted text-sm">
-            {new Date(item.ebayExportedAt).toLocaleString()}
-            {item.ebayListingStatus && ` · Status: ${item.ebayListingStatus}`}
-          </p>
-          <label className="detail-field">
-            <span>eBay listing URL</span>
-            <input
-              id="ebay-listing-url"
-              type="url"
-              className="detail-input"
-              placeholder="https://www.ebay.com/itm/…"
-              value={item.ebayListingUrl ?? ''}
-              onChange={e =>
-                onUpdate({ ebayListingUrl: e.target.value.trim() || undefined })
-              }
-            />
-          </label>
-          {getEbayListingUrl(item) && (
-            <a
-              href={getEbayListingUrl(item)!}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn-link btn-sm"
-              style={{ display: 'inline-block', marginTop: 6 }}
-            >
-              View live listing ↗
-            </a>
-          )}
-          <select
-            className="detail-input"
-            value={item.ebayListingStatus ?? 'exported'}
-            onChange={e =>
-              onUpdate({
-                ebayListingStatus: e.target.value as ItemListing['ebayListingStatus'],
-              })
-            }
-          >
-            <option value="exported">Exported</option>
-            <option value="active">Active on eBay</option>
-            <option value="sold">Sold</option>
-            <option value="ended">Listing ended</option>
-          </select>
-        </div>
+  const listedTrackingSection = readOnly ? (
+    <div className="ebay-status-box">
+      <strong>On eBay</strong>
+      {item.ebayExportedAt ? (
+        <p className="text-muted text-sm">
+          Exported from Mana Market · {new Date(item.ebayExportedAt).toLocaleString()}
+        </p>
+      ) : (
+        <p className="text-muted text-sm">Marked as listed outside this app</p>
       )}
+      {item.ebayListingStatus && (
+        <p className="text-muted text-sm">Status: {item.ebayListingStatus}</p>
+      )}
+      {ebayUrl ? (
+        <a
+          href={ebayUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn-link btn-sm"
+        >
+          View listing on eBay ↗
+        </a>
+      ) : (
+        <p className="text-muted text-sm">No listing URL saved</p>
+      )}
+      <a
+        href={EBAY_SELLER_ACTIVE_LISTINGS_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="btn-link btn-sm"
+      >
+        Open eBay Seller Hub ↗
+      </a>
+    </div>
+  ) : null;
 
-      {payload && (
-        <details className="payload-details">
-          <summary>eBay payload preview</summary>
-          <pre className="json-preview json-preview--sm">
-            {JSON.stringify(payload, null, 2)}
-          </pre>
-        </details>
-      )}
-    </>
-  );
+  const handleDelete = () => {
+    if (window.confirm(`Delete "${getItemTitle(item)}" from your queue?`)) {
+      removeItem(item.id);
+      onClose();
+    }
+  };
 
   return (
-    <ListingEditorModalUI
+    <ItemModalShell
       layout="split"
+      readOnly={readOnly}
       title={getItemTitle(item)}
       subtitle={
         <>
           <span className="item-listing-id">{item.listingId}</span>
           {' · '}
           {getItemStatusLabel(item.status)}
-          {item.ebayExportedAt && (
+          {readOnly && (
             <span className="badge badge--blue" style={{ marginLeft: 8 }}>
-              Already in eBay
+              Listed on eBay
             </span>
           )}
         </>
@@ -291,29 +251,29 @@ export function ItemDetailModal({
       mediaAside={mediaAside}
       formSectionTitle="Listing Settings"
       titleValue={item.customTitle ?? ''}
-      onTitleChange={v => onUpdate({ customTitle: v || undefined })}
+      onTitleChange={v => updateItem(item.id, { customTitle: v || undefined })}
       titlePlaceholder={getDetectedTitle(item)}
       titleHint={
-        hasCustomTitle(item) ? (
+        !readOnly && hasCustomTitle(item) ? (
           <button
             type="button"
             className="btn-link btn-sm"
             style={{ alignSelf: 'flex-start', marginTop: 4 }}
-            onClick={() => onUpdate({ customTitle: undefined })}
+            onClick={() => updateItem(item.id, { customTitle: undefined })}
           >
             Reset to detected title
           </button>
-        ) : (
+        ) : !readOnly ? (
           <span className="text-muted text-sm">
             Detected: {getDetectedTitle(item)}
           </span>
-        )
+        ) : undefined
       }
       descriptionValue={getItemListingDescription(item)}
-      onDescriptionChange={v => onUpdate(patchItemListingDescription(v))}
-      descriptionPlaceholder={product?.description || 'Product description and seller notes…'}
+      onDescriptionChange={v => updateItem(item.id, patchItemListingDescription(v))}
+      descriptionPlaceholder={product?.description || 'Product description…'}
       descriptionHint={
-        !getItemListingDescription(item) && product?.description ? (
+        !readOnly && !getItemListingDescription(item) && product?.description ? (
           <span className="text-muted text-sm">Using detected description</span>
         ) : undefined
       }
@@ -322,20 +282,25 @@ export function ItemDetailModal({
       marketPricePreference={item.marketPricePreference ?? 'ebay'}
       selectedMarketPriceSource={item.selectedMarketPriceSource}
       onMarketPricePreferenceChange={marketPricePreference =>
-        onUpdate({ marketPricePreference })
+        updateItem(item.id, { marketPricePreference })
       }
       onSelectedMarketPriceSourceChange={selectedMarketPriceSource =>
-        onUpdate({ selectedMarketPriceSource })
+        updateItem(item.id, { selectedMarketPriceSource })
       }
       marketPrice={market}
       pricingMode={item.pricingMode}
       percentBelow={item.percentBelow}
       manualPrice={item.manualPrice}
       finalPrice={yourPrice}
-      onPricingModeChange={pricingMode => onUpdate({ pricingMode })}
-      onPercentBelowChange={percentBelow => onUpdate({ percentBelow })}
-      onManualPriceChange={manualPrice => onUpdate({ manualPrice })}
-      afterForm={afterForm}
+      onPricingModeChange={pricingMode => updateItem(item.id, { pricingMode })}
+      onPercentBelowChange={percentBelow => updateItem(item.id, { percentBelow })}
+      onManualPriceChange={manualPrice => updateItem(item.id, { manualPrice })}
+      listedToggle={{
+        checked: isListedToggleOn(item),
+        onChange: checked => updateItem(item.id, listingListedToggleUpdates(checked)),
+      }}
+      afterForm={listedTrackingSection}
+      onDelete={handleDelete}
       secondaryLabel="Close"
       onSecondary={onClose}
     />

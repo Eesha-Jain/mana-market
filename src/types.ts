@@ -116,6 +116,8 @@ export interface ItemListing {
 
   // ── eBay tracking ──
   ebayExportedAt?: string;
+  /** Marked live on eBay without exporting through this app. */
+  listedExternally?: boolean;
   ebayListingStatus?: 'exported' | 'active' | 'sold' | 'ended';
   /** Live eBay listing URL (paste after listing goes active). */
   ebayListingUrl?: string;
@@ -230,16 +232,13 @@ export function itemHasListingImage(item: ItemListing): boolean {
   return getItemPictureUrls(item).length > 0;
 }
 
-/** Combined listing description (custom text + legacy notes field). */
+/** Listing description shown in the UI and eBay export. */
 export function getItemListingDescription(item: ItemListing): string {
-  return [item.customDescription?.trim(), item.notes?.trim()].filter(Boolean).join('\n\n');
+  return item.customDescription?.trim() ?? '';
 }
 
-/** Update the single listing description field (clears legacy notes). */
-export function patchItemListingDescription(text: string): Pick<ItemListing, 'customDescription' | 'notes'> {
+/** Persist a user-edited listing description. */
+export function patchItemListingDescription(text: string): Pick<ItemListing, 'customDescription'> {
   const trimmed = text.trim();
-  return {
-    customDescription: trimmed || undefined,
-    notes: '',
-  };
+  return { customDescription: trimmed || undefined };
 }

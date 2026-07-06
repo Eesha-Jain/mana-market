@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { BrandLogo } from '@/components/ui/BrandLogo';
 import { BrandWordmark } from '@/components/ui/BrandWordmark';
-import { DragonHeroScene } from '@/components/DragonHeroScene';
+import { DragonHeroScene } from '@/components/ui/DragonHeroScene';
 import './page.css';
 
 const HOME_FEATURES = [

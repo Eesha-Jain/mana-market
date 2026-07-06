@@ -10,7 +10,7 @@ export interface ProductReviewData {
   searchQuery: string;
   originalUpc?: string;
   originalSku?: string;
-  /** Spreadsheet / import notes merged into seller notes */
+  /** Spreadsheet import text merged into the initial description */
   importNotes?: string;
   photoUrl?: string;
   ocrText?: string;
@@ -37,7 +37,6 @@ export interface ProductReviewConfirmPayload {
   source: 'manual' | 'csv' | 'photo';
   customTitle?: string;
   customDescription?: string;
-  notes: string;
   originalUpc?: string;
   originalSku?: string;
   quantity: number;
@@ -58,25 +57,15 @@ export interface ProductReviewConfirmPayload {
   };
 }
 
-/** Format UPC for the seller notes field. */
-export function formatUpcSellerNote(upc: string): string {
-  return `UPC: ${upc.trim()}`;
-}
-
-/** Format SKU for the seller notes field. */
-export function formatSkuSellerNote(sku: string): string {
-  return `SKU: ${sku.trim()}`;
-}
-
-/** Build initial seller notes from UPC, SKU, and optional import notes. */
-export function buildInitialSellerNotes(
+/** Build initial description from UPC, SKU, and optional import text. */
+export function buildInitialDescription(
   originalUpc?: string,
   originalSku?: string,
   importNotes?: string,
 ): string {
   const parts: string[] = [];
-  if (originalUpc?.trim()) parts.push(formatUpcSellerNote(originalUpc));
-  if (originalSku?.trim()) parts.push(formatSkuSellerNote(originalSku));
+  if (originalUpc?.trim()) parts.push(`UPC: ${originalUpc.trim()}`);
+  if (originalSku?.trim()) parts.push(`SKU: ${originalSku.trim()}`);
   if (importNotes?.trim()) parts.push(importNotes.trim());
   return parts.join('\n\n');
 }

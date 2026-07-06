@@ -211,7 +211,6 @@ export function PhotoScanTab() {
       manualPrice: payload.manualPrice,
       marketPricePreference: payload.marketPricePreference,
       selectedMarketPriceSource: payload.selectedMarketPriceSource,
-      notes: payload.notes,
       customTitle: payload.customTitle,
       customDescription: payload.customDescription,
       detectedProductType: payload.parseMeta?.packType,

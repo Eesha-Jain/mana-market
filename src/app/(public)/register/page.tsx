@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
+import { register } from '@/lib/auth/client';
 import { useToast } from '@/contexts/ToastContext';
 import { BrandLogo } from '@/components/ui/BrandLogo';
 import { BrandWordmark } from '@/components/ui/BrandWordmark';
@@ -14,7 +14,6 @@ export default function Page() {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [loading, setLoading] = useState(false);
-  const { register } = useAuth();
   const toast = useToast();
   const router = useRouter();
 

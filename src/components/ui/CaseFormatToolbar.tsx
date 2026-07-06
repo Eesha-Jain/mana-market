@@ -48,6 +48,7 @@ interface LabeledFieldWithCaseProps {
   placeholder?: string;
   required?: boolean;
   hint?: ReactNode;
+  readOnly?: boolean;
 }
 
 export function LabeledFieldWithCase({
@@ -61,6 +62,7 @@ export function LabeledFieldWithCase({
   placeholder,
   required,
   hint,
+  readOnly = false,
 }: LabeledFieldWithCaseProps) {
   return (
     <label className="detail-field">
@@ -69,12 +71,14 @@ export function LabeledFieldWithCase({
           {label}
           {required && <span className="required-mark"> *</span>}
         </span>
-        <CaseFormatToolbar
-          value={value}
-          onChange={onChange}
-          onFormatted={onFormatted}
-          onFormatSelect={onFormatSelect}
-        />
+        {!readOnly && (
+          <CaseFormatToolbar
+            value={value}
+            onChange={onChange}
+            onFormatted={onFormatted}
+            onFormatSelect={onFormatSelect}
+          />
+        )}
       </div>
       {multiline ? (
         <textarea
@@ -82,6 +86,8 @@ export function LabeledFieldWithCase({
           rows={rows}
           placeholder={placeholder}
           value={value}
+          readOnly={readOnly}
+          disabled={readOnly}
           onChange={e => onChange(e.target.value)}
         />
       ) : (
@@ -90,6 +96,8 @@ export function LabeledFieldWithCase({
           className="detail-input"
           placeholder={placeholder}
           value={value}
+          readOnly={readOnly}
+          disabled={readOnly}
           onChange={e => onChange(e.target.value)}
         />
       )}

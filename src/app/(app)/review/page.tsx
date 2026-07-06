@@ -21,8 +21,9 @@ import {
   isItemNeedsAction,
 } from '@/utils/itemStatus';
 import { AmbiguousModal } from '@/components/review/AmbiguousModal';
-import { ItemDetailModal } from '@/components/listings/ItemDetailModal';
+import { ItemModal } from '@/components/listings/ItemModal';
 import { ItemsTable } from '@/components/listings/ItemsTable';
+import { Modal } from '@/components/ui/Modal';
 import { CsvExportModal } from '@/components/upload/CsvExportModal';
 
 export default function Page() {
@@ -229,9 +230,10 @@ export default function Page() {
       )}
 
       {detailItem && (
-        <ItemDetailModal
+        <ItemModal
+          key={detailItem.id}
+          mode="detail"
           item={items.find(i => i.id === detailItem.id) ?? detailItem}
-          onUpdate={updates => updateItem(detailItem.id, updates)}
           onClose={() => setDetailItem(null)}
           onResolveAmbiguous={
             detailItem.status === ITEM_STATUS.Ambiguous
@@ -246,23 +248,19 @@ export default function Page() {
       )}
 
       {exportAll && (
-        <div className="modal-overlay" onClick={() => setExportAll(false)}>
-          <div className="modal modal--wide" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <div>
-                <h2 className="modal-title">eBay AddItem Payloads</h2>
-                <p className="modal-subtitle">{readyCount} listing{readyCount !== 1 ? 's' : ''} ready</p>
-              </div>
-              <button className="modal-close" onClick={() => setExportAll(false)}>✕</button>
-            </div>
-            <div className="modal-body">
-              <pre className="json-preview">{exportListingsJSON(items)}</pre>
-            </div>
-            <div className="modal-footer">
-              <button className="btn-primary" onClick={handleExportAll}>↓ Download JSON</button>
-            </div>
-          </div>
-        </div>
+        <Modal
+          wide
+          title="eBay AddItem Payloads"
+          subtitle={`${readyCount} listing${readyCount !== 1 ? 's' : ''} ready`}
+          onClose={() => setExportAll(false)}
+          footer={
+            <button type="button" className="btn-primary" onClick={handleExportAll}>
+              ↓ Download JSON
+            </button>
+          }
+        >
+          <pre className="json-preview">{exportListingsJSON(items)}</pre>
+        </Modal>
       )}
     </div>
   );
