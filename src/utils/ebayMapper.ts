@@ -1,5 +1,6 @@
 import type { ItemListing, EbayListingPayload } from '../types';
 import { EBAY_CONDITIONS, getItemTitle, getItemListingDescription, getItemPictureUrls } from '../types';
+import { isItemFound } from './itemStatus';
 import { resolveItemMarketPrice } from './marketPrice';
 import { resolveItemProductType } from './productType';
 import { calculateDraftPrice } from './pricing';
@@ -89,7 +90,7 @@ function buildItemSpecifics(item: ItemListing): Record<string, string> {
 }
 
 export function isItemReady(item: ItemListing): boolean {
-  if (item.status !== 'found' || !item.condition || calculatePrice(item) === null) {
+  if (!isItemFound(item) || !item.condition || calculatePrice(item) === null) {
     return false;
   }
   return !!item.product;
@@ -99,8 +100,18 @@ export function isItemOnEbay(item: ItemListing): boolean {
   return !!item.ebayExportedAt;
 }
 
+/** User-provided live listing URL, when set. */
+export function getEbayListingUrl(item: ItemListing): string | null {
+  const url = item.ebayListingUrl?.trim();
+  if (!url) return null;
+  if (!/^https?:\/\//i.test(url)) return null;
+  return url;
+}
+
+export const EBAY_SELLER_ACTIVE_LISTINGS_URL = 'https://www.ebay.com/sh/lst/active';
+
 export function buildEbayListing(item: ItemListing): EbayListingPayload | null {
-  if (item.status !== 'found' || !item.condition || !item.product) return null;
+  if (!isItemFound(item) || !item.condition || !item.product) return null;
 
   const price = calculatePrice(item);
   if (price === null) return null;
@@ -122,6 +133,7 @@ export function buildEbayListing(item: ItemListing): EbayListingPayload | null {
     itemSpecifics: buildItemSpecifics(item),
     listingType: 'FixedPriceItem',
     listingDuration: 'GTC',
+    sku: item.listingId,
   };
 }
 

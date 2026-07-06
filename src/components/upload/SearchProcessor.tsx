@@ -7,19 +7,24 @@
  */
 import { useEffect, useRef } from 'react';
 import { useItems } from '@/contexts/ItemsContext';
+import { ITEM_STATUS } from '@/types';
+import { useToast } from '@/contexts/ToastContext';
 import { searchProduct } from '@/utils/productApi';
 import { resolveSearchParams } from '@/utils/productLookup';
+import { findNextIdleItem } from '@/utils/itemStatus';
 
 export function SearchProcessor() {
   const { items, updateItem } = useItems();
+  const toast = useToast();
   const busy = useRef(false);
+  const lastUnavailableToastRef = useRef<string | null>(null);
 
   useEffect(() => {
-    const idle = items.find(i => i.status === 'idle' && !i.product);
+    const idle = findNextIdleItem(items);
     if (!idle || busy.current) return;
 
     busy.current = true;
-    updateItem(idle.id, { status: 'searching' });
+    updateItem(idle.id, { status: ITEM_STATUS.Searching });
 
     processItem(idle.id, idle.query, idle.originalUpc, idle.originalSku)
       .finally(() => {
@@ -43,7 +48,7 @@ export function SearchProcessor() {
 
       if (result.type === 'found') {
         updateItem(id, {
-          status:  'found',
+          status: ITEM_STATUS.Found,
           product: result.product,
         });
         return;
@@ -51,14 +56,21 @@ export function SearchProcessor() {
 
       if (result.type === 'ambiguous') {
         updateItem(id, {
-          status:           'ambiguous',
+          status: ITEM_STATUS.Ambiguous,
           ambiguousResults: result.results,
         });
         return;
       }
 
       if (result.type === 'not_found' || result.type === 'unavailable') {
-        updateItem(id, { status: 'not_found' });
+        if (result.type === 'unavailable') {
+          const reason = result.reason || 'Product lookup is unavailable.';
+          if (reason !== lastUnavailableToastRef.current) {
+            lastUnavailableToastRef.current = reason;
+            toast.error(`Lookup failed for "${query}": ${reason}`);
+          }
+        }
+        updateItem(id, { status: ITEM_STATUS.NotFound });
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -1,32 +1,29 @@
 'use client';
 
-import { createContext, useContext, useEffect, useRef, useState, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { applyTextCase } from '../utils/textCase';
 import {
   DEFAULT_USER_SETTINGS,
-  isDefaultConfigured,
+  isSettingConfigured,
   loadUserSettings,
+  resolveDescriptionCase,
+  resolveTitleCase,
   type PhotoCaptureTarget,
   type UserSettingKey,
   type UserSettings,
 } from '../utils/userSettings';
 import { useAuth } from './AuthContext';
+import { useToast } from './ToastContext';
 import { isSupabaseConfigured, getAccessToken } from '@/lib/supabase/client';
-import { fetchUserSettingsAction, saveUserSettingsAction } from '@/app/actions/settings';
+import { fetchUserSettingsAction, saveUserSettingsAction } from '@/lib/settings/actions';
 
 interface UserSettingsContextType {
   settings: UserSettings;
-  syncError: string | null;
-  loadError: string | null;
-  clearSyncError: () => void;
-  clearLoadError: () => void;
   updateSettings: (patch: Partial<UserSettings>) => void;
-  isDefaultConfigured: (key: UserSettingKey) => boolean;
-  saveConfiguredDefault: (patch: Partial<UserSettings>, keys: UserSettingKey | UserSettingKey[]) => void;
-  clearConfiguredDefault: (key: UserSettingKey, patch?: Partial<UserSettings>) => void;
+  isSettingConfigured: (key: UserSettingKey) => boolean;
   applyDefaultTitleCase: (text: string) => string;
   applyDefaultDescriptionCase: (text: string) => string;
-  defaultPhotoCaptureTarget: PhotoCaptureTarget | null;
+  photoCaptureTarget: PhotoCaptureTarget | null;
 }
 
 const UserSettingsContext = createContext<UserSettingsContextType | null>(null);
@@ -49,18 +46,6 @@ function writeLocalSettings(userId: string, settings: UserSettings) {
   localStorage.setItem(localStorageKey(userId), JSON.stringify(settings));
 }
 
-function markKeysConfigured(
-  configured: UserSettings['configuredDefaults'],
-  keys: UserSettingKey | UserSettingKey[],
-): UserSettings['configuredDefaults'] {
-  const next = { ...configured };
-  const list = Array.isArray(keys) ? keys : [keys];
-  for (const key of list) {
-    next[key] = true;
-  }
-  return next;
-}
-
 function formatSyncError(err: unknown, action: string): string {
   const detail = err instanceof Error ? err.message : String(err);
   return `Could not ${action}: ${detail}.`;
@@ -68,27 +53,21 @@ function formatSyncError(err: unknown, action: string): string {
 
 export function UserSettingsProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
+  const toast = useToast();
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_USER_SETTINGS);
-  const [syncError, setSyncError] = useState<string | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
   const hydratedRef = useRef(false);
   const dirtyRef = useRef(false);
-
-  const clearSyncError = useCallback(() => setSyncError(null), []);
-  const clearLoadError = useCallback(() => setLoadError(null), []);
 
   useEffect(() => {
     if (!user) {
       hydratedRef.current = false;
       dirtyRef.current = false;
       setSettings(DEFAULT_USER_SETTINGS);
-      setLoadError(null);
       return;
     }
 
     dirtyRef.current = false;
     hydratedRef.current = false;
-    setLoadError(null);
 
     if (isSupabaseConfigured()) {
       void getAccessToken()
@@ -103,7 +82,7 @@ export function UserSettingsProvider({ children }: { children: ReactNode }) {
         })
         .catch(err => {
           if (dirtyRef.current) return;
-          setLoadError(formatSyncError(err, 'load your settings'));
+          toast.error(formatSyncError(err, 'load your settings'));
           setSettings(DEFAULT_USER_SETTINGS);
           hydratedRef.current = true;
         });
@@ -112,7 +91,7 @@ export function UserSettingsProvider({ children }: { children: ReactNode }) {
 
     hydratedRef.current = true;
     setSettings(readLocalSettings(user.id));
-  }, [user?.id]);
+  }, [user?.id, toast]);
 
   useEffect(() => {
     if (!user || !hydratedRef.current) return;
@@ -121,7 +100,7 @@ export function UserSettingsProvider({ children }: { children: ReactNode }) {
       void getAccessToken().then(token => {
         if (!token) return;
         void saveUserSettingsAction(token, settings).catch(err => {
-          setSyncError(formatSyncError(err, 'save settings'));
+          toast.error(formatSyncError(err, 'save settings'));
         });
       });
       return;
@@ -135,50 +114,22 @@ export function UserSettingsProvider({ children }: { children: ReactNode }) {
     setSettings(prev => ({ ...prev, ...patch }));
   };
 
-  const saveConfiguredDefault = (patch: Partial<UserSettings>, keys: UserSettingKey | UserSettingKey[]) => {
-    dirtyRef.current = true;
-    setSettings(prev => ({
-      ...prev,
-      ...patch,
-      configuredDefaults: markKeysConfigured(prev.configuredDefaults, keys),
-    }));
-  };
+  const checkConfigured = (key: UserSettingKey) => isSettingConfigured(settings, key);
 
-  const clearConfiguredDefault = (key: UserSettingKey, patch: Partial<UserSettings> = {}) => {
-    dirtyRef.current = true;
-    setSettings(prev => {
-      const configuredDefaults = { ...prev.configuredDefaults };
-      delete configuredDefaults[key];
-      return { ...prev, ...patch, configuredDefaults };
-    });
-  };
-
-  const checkConfigured = (key: UserSettingKey) => isDefaultConfigured(settings, key);
-
-  const applyDefaultTitleCase = (text: string) => applyTextCase(text, settings.defaultTitleCase);
+  const applyDefaultTitleCase = (text: string) => applyTextCase(text, resolveTitleCase(settings));
 
   const applyDefaultDescriptionCase = (text: string) =>
-    applyTextCase(text, settings.defaultDescriptionCase);
-
-  const defaultPhotoCaptureTarget = checkConfigured('photoCaptureTarget')
-    ? settings.defaultPhotoCaptureTarget
-    : null;
+    applyTextCase(text, resolveDescriptionCase(settings));
 
   return (
     <UserSettingsContext.Provider
       value={{
         settings,
-        syncError,
-        loadError,
-        clearSyncError,
-        clearLoadError,
         updateSettings,
-        isDefaultConfigured: checkConfigured,
-        saveConfiguredDefault,
-        clearConfiguredDefault,
+        isSettingConfigured: checkConfigured,
         applyDefaultTitleCase,
         applyDefaultDescriptionCase,
-        defaultPhotoCaptureTarget,
+        photoCaptureTarget: settings.photoCaptureTarget,
       }}
     >
       {children}

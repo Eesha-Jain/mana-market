@@ -3,6 +3,7 @@
 import { useState, useRef, type ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useItems } from '@/contexts/ItemsContext';
+import { useToast } from '@/contexts/ToastContext';
 import { useUserSettings } from '@/contexts/UserSettingsContext';
 import { buildPhotoReviewData } from '@/utils/photoReview';
 import { persistPhotoScanImage } from '@/utils/imageUpload';
@@ -11,6 +12,7 @@ import { PhotoCaptureTargetSelector } from './PhotoCaptureTargetSelector';
 import { SaveDefaultPrompt, type DefaultSaveOffer } from '@/components/ui/SaveDefaultPrompt';
 import type { ProductReviewConfirmPayload, ProductReviewData } from '@/utils/productReview';
 import type { EbayCondition } from '@/types';
+import { statusFromProductMatch } from '@/utils/itemStatus';
 import {
   describePhotoCaptureTarget,
   settingLabel,
@@ -65,10 +67,11 @@ function revokePendingPhotos(photos: PendingPhoto[]) {
 
 export function PhotoScanTab() {
   const { addItem, items } = useItems();
+  const toast = useToast();
   const {
-    defaultPhotoCaptureTarget,
-    isDefaultConfigured,
-    saveConfiguredDefault,
+    photoCaptureTarget,
+    isSettingConfigured,
+    updateSettings,
   } = useUserSettings();
   const router = useRouter();
   const singleFileRef = useRef<HTMLInputElement>(null);
@@ -78,12 +81,11 @@ export function PhotoScanTab() {
 
   const [scanMode, setScanMode] = useState<'single' | 'bulk'>('single');
   const [sessionCaptureTarget, setSessionCaptureTarget] = useState<PhotoCaptureTarget | null>(null);
-  const [captureTargetError, setCaptureTargetError] = useState('');
   const [pendingSaveOffer, setPendingSaveOffer] = useState<DefaultSaveOffer | null>(null);
   const [pendingSaveTarget, setPendingSaveTarget] = useState<PhotoCaptureTarget | null>(null);
 
-  const photoTargetConfigured = isDefaultConfigured('photoCaptureTarget');
-  const effectiveCaptureTarget = sessionCaptureTarget ?? defaultPhotoCaptureTarget;
+  const photoTargetConfigured = isSettingConfigured('photoCaptureTarget');
+  const effectiveCaptureTarget = sessionCaptureTarget ?? photoCaptureTarget;
   const requirePhotoTargetSelection = !photoTargetConfigured && !sessionCaptureTarget;
 
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -93,7 +95,6 @@ export function PhotoScanTab() {
   const [pendingPhotos, setPendingPhotos] = useState<PendingPhoto[]>([]);
   const [bulkProcessing, setBulkProcessing] = useState(false);
   const [bulkIndex, setBulkIndex] = useState(0);
-  const [bulkFileError, setBulkFileError] = useState('');
 
   const pendingPhotosRef = useRef(pendingPhotos);
   const bulkIndexRef = useRef(bulkIndex);
@@ -127,7 +128,6 @@ export function PhotoScanTab() {
     setBulkIndex(0);
     setReviewData(null);
     setScanning(false);
-    setBulkFileError('');
   };
 
   const resetAll = () => {
@@ -136,7 +136,6 @@ export function PhotoScanTab() {
   };
 
   const handleCaptureTargetChange = (target: PhotoCaptureTarget) => {
-    setCaptureTargetError('');
     setSessionCaptureTarget(target);
 
     if (!photoTargetConfigured) {
@@ -151,13 +150,13 @@ export function PhotoScanTab() {
 
   const ensureCaptureTarget = (): PhotoCaptureTarget | null => {
     if (effectiveCaptureTarget) return effectiveCaptureTarget;
-    setCaptureTargetError('Choose what you are photographing before taking a photo.');
+    toast.error('Choose what you are photographing before taking a photo.');
     return null;
   };
 
   const handleSaveDefaultConfirm = () => {
     if (pendingSaveTarget) {
-      saveConfiguredDefault({ defaultPhotoCaptureTarget: pendingSaveTarget }, 'photoCaptureTarget');
+      updateSettings({ photoCaptureTarget: pendingSaveTarget });
     }
     setPendingSaveOffer(null);
     setPendingSaveTarget(null);
@@ -217,7 +216,7 @@ export function PhotoScanTab() {
       customDescription: payload.customDescription,
       detectedProductType: payload.parseMeta?.packType,
       detectedCardCount: payload.parseMeta?.cardCount,
-      status: payload.product ? 'found' : 'not_found',
+      status: statusFromProductMatch(!!payload.product),
       product: payload.product,
     });
   };
@@ -321,7 +320,6 @@ export function PhotoScanTab() {
     bulkProcessingRef.current = true;
     setBulkProcessing(true);
     setBulkIndex(0);
-    setBulkFileError('');
     void processBulkPhotoAt(0, photos);
   };
 
@@ -383,16 +381,14 @@ export function PhotoScanTab() {
     const next = addPendingFiles(picked, pendingPhotosRef.current);
 
     if (next.length === pendingPhotosRef.current.length) {
-      setBulkFileError('No image files were recognized. Try JPG, PNG, or HEIC.');
+      toast.error('No image files were recognized. Try JPG, PNG, or HEIC.');
       return;
     }
 
-    setBulkFileError('');
     setPendingPhotos(next);
   };
 
   const removePendingPhoto = (id: string) => {
-    setBulkFileError('');
     setPendingPhotos(prev => {
       const target = prev.find(p => p.id === id);
       if (target) URL.revokeObjectURL(target.previewUrl);
@@ -439,10 +435,6 @@ export function PhotoScanTab() {
         onChange={handleCaptureTargetChange}
         requireSelection={requirePhotoTargetSelection}
       />
-
-      {captureTargetError && (
-        <div className="form-error-banner photo-capture-target-error">{captureTargetError}</div>
-      )}
 
       <div className="photo-scan-mode-bar">
         <button
@@ -562,10 +554,6 @@ export function PhotoScanTab() {
             </div>
           </div>
 
-          {bulkFileError && (
-            <div className="form-error-banner">{bulkFileError}</div>
-          )}
-
           {pendingPhotos.length > 0 ? (
             <>
               <div className="photo-bulk-grid">
@@ -598,31 +586,6 @@ export function PhotoScanTab() {
               Add photos with the camera or pick several from your library, then click Done to review each one.
             </p>
           )}
-        </div>
-      )}
-
-      {bulkProcessing && bulkProgress && (
-        <div className="photo-batch-progress-banner photo-batch-progress-banner--interactive" role="status" aria-live="polite">
-          <span className="photo-batch-progress-count">
-            Photo {bulkProgress.current} of {bulkProgress.total}
-          </span>
-          {bulkProgress.remaining > 0 ? (
-            <span className="photo-batch-progress-remaining">
-              {bulkProgress.remaining} left after this one
-            </span>
-          ) : (
-            <span className="photo-batch-progress-remaining">Last photo</span>
-          )}
-          <div className="batch-exit-actions">
-            {items.length > 0 && (
-              <button type="button" className="btn-link btn-sm" onClick={handleExitToReview}>
-                Review all →
-              </button>
-            )}
-            <button type="button" className="btn-link btn-sm batch-exit-cancel" onClick={handleCancelBatch}>
-              Cancel upload
-            </button>
-          </div>
         </div>
       )}
 

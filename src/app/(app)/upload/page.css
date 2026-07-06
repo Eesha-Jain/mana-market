@@ -1,0 +1,227 @@
+.upload-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  margin-bottom: 28px;
+}
+
+.tab-bar {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.tab-btn {
+  background: transparent;
+  color: var(--text-muted);
+  padding: 12px 20px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.tab-btn:hover {
+  color: var(--text);
+}
+
+.tab-btn.active {
+  color: var(--gold);
+  border-bottom-color: var(--gold);
+}
+
+.tab-content {
+  padding: 20px;
+}
+
+.tab-hint {
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  margin-bottom: 14px;
+}
+
+.tab-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.single-input-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.single-input {
+  flex: 1;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  font-size: 0.95rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.single-input:focus {
+  border-color: var(--gold);
+}
+
+.bulk-textarea {
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+  resize: vertical;
+  outline: none;
+  font-family: var(--font-mono);
+}
+
+.bulk-textarea:focus {
+  border-color: var(--gold);
+}
+
+.dropzone {
+  border: 2px dashed var(--border);
+  border-radius: var(--radius-lg);
+  padding: 48px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.dropzone:hover,
+.dropzone--active {
+  border-color: var(--gold);
+  background: var(--gold-subtle);
+}
+
+.dropzone-icon {
+  font-size: 2.5rem;
+}
+
+.dropzone-text {
+  font-weight: 500;
+  font-size: 0.95rem;
+}
+
+.dropzone-hint {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.csv-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.csv-preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.csv-preview-count {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.csv-preview-table-wrapper {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 12px;
+}
+
+.csv-preview-more {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  padding: 8px 14px;
+}
+
+.progress-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  margin-bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.progress-stats {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.progress-bar-track {
+  height: 4px;
+  background: var(--surface-3);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: var(--gold);
+  border-radius: 2px;
+  transition: width 0.4s ease;
+}
+
+.upload-queue {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px 20px;
+}
+
+.csv-input-area {
+  display: flex;
+  flex-direction: column;
+}
+
+.paste-divider {
+  display: flex;
+  align-items: center;
+  margin: 18px 0 14px;
+  color: var(--text-faint);
+  font-size: 0.82rem;
+  gap: 10px;
+}
+
+.paste-divider::before,
+.paste-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.barcode-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background: var(--blue-dim);
+  border: 1px solid var(--blue);
+  color: var(--blue);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  font-size: 0.85rem;
+  margin-bottom: 12px;
+  line-height: 1.4;
+}

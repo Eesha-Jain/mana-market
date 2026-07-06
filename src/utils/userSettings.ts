@@ -13,26 +13,33 @@ export type UserSettingKey =
   | 'percentBelow'
   | 'marketPriceSource';
 
+/** Stored user settings. Null means the user has not saved a preference yet. */
 export interface UserSettings {
-  /** null = user has not chosen a default — prompt on each photo scan. */
-  defaultPhotoCaptureTarget: PhotoCaptureTarget | null;
-  defaultTitleCase: TextCaseFormat;
-  defaultDescriptionCase: TextCaseFormat;
-  defaultPricingMode: PricingMode;
-  defaultPercentBelow: number;
-  defaultMarketPricePreference: MarketPricePreference;
-  /** Which defaults the user has explicitly saved (via Settings or "save as default" prompts). */
-  configuredDefaults: Partial<Record<UserSettingKey, true>>;
+  photoCaptureTarget: PhotoCaptureTarget | null;
+  titleCase: TextCaseFormat | null;
+  descriptionCase: TextCaseFormat | null;
+  pricingMode: PricingMode | null;
+  percentBelow: number | null;
+  marketPricePreference: MarketPricePreference | null;
 }
 
+/** Empty stored settings — all preferences unset. */
 export const DEFAULT_USER_SETTINGS: UserSettings = {
-  defaultPhotoCaptureTarget: null,
-  defaultTitleCase: 'as_detected',
-  defaultDescriptionCase: 'as_detected',
-  defaultPricingMode: 'market',
-  defaultPercentBelow: 10,
-  defaultMarketPricePreference: 'ebay',
-  configuredDefaults: {},
+  photoCaptureTarget: null,
+  titleCase: null,
+  descriptionCase: null,
+  pricingMode: null,
+  percentBelow: null,
+  marketPricePreference: null,
+};
+
+/** App fallbacks used when a stored setting is null. */
+export const USER_SETTINGS_FALLBACKS = {
+  titleCase: 'as_detected' as TextCaseFormat,
+  descriptionCase: 'as_detected' as TextCaseFormat,
+  pricingMode: 'market' as PricingMode,
+  percentBelow: 10,
+  marketPricePreference: 'ebay' as MarketPricePreference,
 };
 
 export const MARKET_PRICE_PREFERENCE_OPTIONS: {
@@ -92,53 +99,128 @@ export function normalizePhotoCaptureTarget(value: unknown): PhotoCaptureTarget 
   return null;
 }
 
-export function normalizePricingMode(value: unknown): PricingMode {
+export function normalizePricingMode(value: unknown): PricingMode | null {
   if (value === 'market' || value === 'percent_below' || value === 'manual') return value;
-  return 'market';
+  return null;
 }
 
-export function normalizeMarketPricePreference(value: unknown): MarketPricePreference {
+export function normalizeMarketPricePreference(value: unknown): MarketPricePreference | null {
   if (value === 'ebay' || value === 'upc' || value === 'show_all') return value;
-  return 'ebay';
+  return null;
 }
 
-export function normalizePercentBelow(value: unknown): number {
-  const n = typeof value === 'number' ? value : parseInt(String(value ?? ''), 10);
-  if (!Number.isFinite(n)) return DEFAULT_USER_SETTINGS.defaultPercentBelow;
+export function normalizePercentBelow(value: unknown): number | null {
+  if (value == null || value === '') return null;
+  const n = typeof value === 'number' ? value : parseInt(String(value), 10);
+  if (!Number.isFinite(n)) return null;
   return Math.min(99, Math.max(1, n));
 }
 
-function migrateConfiguredDefaults(raw: Partial<UserSettings> | null | undefined): Partial<Record<UserSettingKey, true>> {
-  if (raw?.configuredDefaults && typeof raw.configuredDefaults === 'object') {
-    return { ...raw.configuredDefaults };
-  }
-
-  if (!raw) return {};
-
-  const configured: Partial<Record<UserSettingKey, true>> = {};
-  if (raw.defaultTitleCase !== undefined) configured.titleCase = true;
-  if (raw.defaultDescriptionCase !== undefined) configured.descriptionCase = true;
-  if (raw.defaultPricingMode !== undefined) configured.pricingMode = true;
-  if (raw.defaultPercentBelow !== undefined) configured.percentBelow = true;
-  if (raw.defaultPhotoCaptureTarget != null) configured.photoCaptureTarget = true;
-  if (raw.defaultMarketPricePreference !== undefined) configured.marketPriceSource = true;
-  return configured;
+function normalizeTextCaseFormatStored(value: unknown): TextCaseFormat | null {
+  if (value == null || value === '') return null;
+  return normalizeTextCaseFormat(value);
 }
 
-export function loadUserSettings(raw: Partial<UserSettings> | null | undefined): UserSettings {
+type LegacyUserSettings = Partial<UserSettings> & {
+  configuredDefaults?: Partial<Record<UserSettingKey, true>>;
+  defaultPhotoCaptureTarget?: PhotoCaptureTarget | null;
+  defaultTitleCase?: TextCaseFormat | null;
+  defaultDescriptionCase?: TextCaseFormat | null;
+  defaultPricingMode?: PricingMode | null;
+  defaultPercentBelow?: number | null;
+  defaultMarketPricePreference?: MarketPricePreference | null;
+};
+
+function readStoredField<T>(
+  raw: LegacyUserSettings,
+  key: keyof UserSettings,
+  legacyKey: keyof LegacyUserSettings,
+): T | null | undefined {
+  if (raw[key] !== undefined) return raw[key] as T | null;
+  return raw[legacyKey] as T | null | undefined;
+}
+
+function migrateFromConfiguredDefaults(raw: LegacyUserSettings): UserSettings {
+  const configured = raw.configuredDefaults ?? {};
   return {
-    defaultPhotoCaptureTarget: normalizePhotoCaptureTarget(raw?.defaultPhotoCaptureTarget),
-    defaultTitleCase: normalizeTextCaseFormat(raw?.defaultTitleCase),
-    defaultDescriptionCase: normalizeTextCaseFormat(raw?.defaultDescriptionCase),
-    defaultPricingMode: normalizePricingMode(raw?.defaultPricingMode),
-    defaultPercentBelow: normalizePercentBelow(raw?.defaultPercentBelow),
-    defaultMarketPricePreference: normalizeMarketPricePreference(raw?.defaultMarketPricePreference),
-    configuredDefaults: migrateConfiguredDefaults(raw),
+    photoCaptureTarget: configured.photoCaptureTarget
+      ? normalizePhotoCaptureTarget(readStoredField(raw, 'photoCaptureTarget', 'defaultPhotoCaptureTarget'))
+      : null,
+    titleCase: configured.titleCase
+      ? normalizeTextCaseFormatStored(readStoredField(raw, 'titleCase', 'defaultTitleCase'))
+      : null,
+    descriptionCase: configured.descriptionCase
+      ? normalizeTextCaseFormatStored(readStoredField(raw, 'descriptionCase', 'defaultDescriptionCase'))
+      : null,
+    pricingMode: configured.pricingMode
+      ? normalizePricingMode(readStoredField(raw, 'pricingMode', 'defaultPricingMode'))
+      : null,
+    percentBelow: configured.percentBelow
+      ? normalizePercentBelow(readStoredField(raw, 'percentBelow', 'defaultPercentBelow'))
+      : null,
+    marketPricePreference: configured.marketPriceSource
+      ? normalizeMarketPricePreference(
+          readStoredField(raw, 'marketPricePreference', 'defaultMarketPricePreference'),
+        )
+      : null,
   };
 }
 
-export function isDefaultConfigured(settings: UserSettings, key: UserSettingKey): boolean {
-  return settings.configuredDefaults[key] === true;
+export function loadUserSettings(raw: LegacyUserSettings | null | undefined): UserSettings {
+  if (!raw) return DEFAULT_USER_SETTINGS;
+  if (raw.configuredDefaults) return migrateFromConfiguredDefaults(raw);
+
+  return {
+    photoCaptureTarget: normalizePhotoCaptureTarget(
+      readStoredField(raw, 'photoCaptureTarget', 'defaultPhotoCaptureTarget'),
+    ),
+    titleCase: normalizeTextCaseFormatStored(readStoredField(raw, 'titleCase', 'defaultTitleCase')),
+    descriptionCase: normalizeTextCaseFormatStored(
+      readStoredField(raw, 'descriptionCase', 'defaultDescriptionCase'),
+    ),
+    pricingMode: normalizePricingMode(readStoredField(raw, 'pricingMode', 'defaultPricingMode')),
+    percentBelow: normalizePercentBelow(readStoredField(raw, 'percentBelow', 'defaultPercentBelow')),
+    marketPricePreference: normalizeMarketPricePreference(
+      readStoredField(raw, 'marketPricePreference', 'defaultMarketPricePreference'),
+    ),
+  };
+}
+
+export function resolveTitleCase(settings: UserSettings): TextCaseFormat {
+  return settings.titleCase ?? USER_SETTINGS_FALLBACKS.titleCase;
+}
+
+export function resolveDescriptionCase(settings: UserSettings): TextCaseFormat {
+  return settings.descriptionCase ?? USER_SETTINGS_FALLBACKS.descriptionCase;
+}
+
+export function resolvePricingMode(settings: UserSettings): PricingMode {
+  return settings.pricingMode ?? USER_SETTINGS_FALLBACKS.pricingMode;
+}
+
+export function resolvePercentBelow(settings: UserSettings): number {
+  return settings.percentBelow ?? USER_SETTINGS_FALLBACKS.percentBelow;
+}
+
+export function resolveMarketPricePreference(settings: UserSettings): MarketPricePreference {
+  return settings.marketPricePreference ?? USER_SETTINGS_FALLBACKS.marketPricePreference;
+}
+
+export function isSettingConfigured(settings: UserSettings, key: UserSettingKey): boolean {
+  switch (key) {
+    case 'photoCaptureTarget':
+      return settings.photoCaptureTarget != null;
+    case 'titleCase':
+      return settings.titleCase != null;
+    case 'descriptionCase':
+      return settings.descriptionCase != null;
+    case 'pricingMode':
+      return settings.pricingMode != null;
+    case 'percentBelow':
+      return settings.percentBelow != null;
+    case 'marketPriceSource':
+      return settings.marketPricePreference != null;
+  }
 }
 
 export function settingLabel(key: UserSettingKey): string {
@@ -173,7 +255,9 @@ export function describeTextCaseFormat(format: TextCaseFormat): string {
 
 export function describePricingMode(mode: PricingMode, percentBelow?: number): string {
   if (mode === 'manual') return 'Manual price';
-  if (mode === 'percent_below') return `${percentBelow ?? DEFAULT_USER_SETTINGS.defaultPercentBelow}% below market`;
+  if (mode === 'percent_below') {
+    return `${percentBelow ?? USER_SETTINGS_FALLBACKS.percentBelow}% below market`;
+  }
   return 'Market price';
 }
 
@@ -197,14 +281,14 @@ export function resolveDefaultPricing(
   if (hasImportManualPrice) {
     return {
       pricingMode: 'manual',
-      percentBelow: settings.defaultPercentBelow,
+      percentBelow: resolvePercentBelow(settings),
       manualPrice: draft.manualPrice,
     };
   }
 
   return {
-    pricingMode: settings.defaultPricingMode,
-    percentBelow: settings.defaultPercentBelow,
+    pricingMode: resolvePricingMode(settings),
+    percentBelow: resolvePercentBelow(settings),
     manualPrice: 0,
   };
 }

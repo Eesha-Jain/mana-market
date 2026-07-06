@@ -1,5 +1,6 @@
 import 'server-only';
 
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { publicEnv } from '@/lib/env/public';
 import { createServerSupabase } from '@/lib/supabase/server';
 
@@ -31,6 +32,15 @@ export async function requireAccessToken(
   const userId = await verifyAccessToken(accessToken);
   if (!userId) throw new Error('Unauthorized');
   return userId;
+}
+
+export async function withAuthenticatedClient<T>(
+  accessToken: string,
+  fn: (supabase: SupabaseClient, userId: string) => Promise<T>,
+): Promise<T> {
+  const userId = await requireAccessToken(accessToken);
+  const supabase = createServerSupabase(accessToken);
+  return fn(supabase, userId);
 }
 
 /** Returns user id when auth succeeds, or a 401 Response when Supabase auth is required. */

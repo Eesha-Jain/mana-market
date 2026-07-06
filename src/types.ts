@@ -26,7 +26,17 @@ export const EBAY_CONDITIONS: EbayConditionInfo[] = [
 ];
 
 export type PricingMode = 'market' | 'percent_below' | 'manual';
-export type ItemStatus  = 'idle' | 'searching' | 'found' | 'ambiguous' | 'not_found';
+
+/** Listing lookup lifecycle — mirrors public.item_status in Supabase. */
+export const ITEM_STATUS = {
+  Idle: 'idle',
+  Searching: 'searching',
+  Found: 'found',
+  Ambiguous: 'ambiguous',
+  NotFound: 'not_found',
+} as const;
+
+export type ItemStatus = typeof ITEM_STATUS[keyof typeof ITEM_STATUS];
 
 export type MarketPriceSource =
   | 'ebay_completed'
@@ -107,6 +117,8 @@ export interface ItemListing {
   // ── eBay tracking ──
   ebayExportedAt?: string;
   ebayListingStatus?: 'exported' | 'active' | 'sold' | 'ended';
+  /** Live eBay listing URL (paste after listing goes active). */
+  ebayListingUrl?: string;
 
   // ── Photo scan metadata ──
   photoUrl?: string;
@@ -148,6 +160,8 @@ export interface EbayListingPayload {
   itemSpecifics: Record<string, string>;
   listingType: 'FixedPriceItem';
   listingDuration: 'GTC';
+  /** Cross-reference SKU included in export JSON — matches listingId. */
+  sku?: string;
 }
 
 /** Generate a short, human-readable listing ID. */

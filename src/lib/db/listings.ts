@@ -1,15 +1,16 @@
 import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { ItemListing, Product } from '@/types';
-import { generateListingId } from '@/types';
+import type { ItemListing, Product, ItemStatus } from '@/types';
+import { ITEM_STATUS, generateListingId } from '@/types';
+import { isItemStatus } from '@/utils/itemStatus';
 
 export interface ListingRow {
   id: string;
   user_id: string;
   listing_id: string;
   query: string;
-  status: string;
+  status: ItemStatus;
   original_upc: string | null;
   original_sku: string | null;
   product: Product | null;
@@ -26,6 +27,7 @@ export interface ListingRow {
   notes: string;
   ebay_exported_at: string | null;
   ebay_listing_status: string | null;
+  ebay_listing_url: string | null;
   photo_url: string | null;
   user_image_url: string | null;
   preferred_image_source: string | null;
@@ -47,7 +49,7 @@ export function rowToListing(row: ListingRow): ItemListing {
     id: row.id,
     listingId: row.listing_id,
     query: row.query,
-    status: row.status as ItemListing['status'],
+    status: isItemStatus(row.status) ? row.status : ITEM_STATUS.Idle,
     originalUpc: row.original_upc ?? undefined,
     originalSku: row.original_sku ?? undefined,
     product: row.product ?? undefined,
@@ -64,6 +66,7 @@ export function rowToListing(row: ListingRow): ItemListing {
     notes: row.notes,
     ebayExportedAt: row.ebay_exported_at ?? undefined,
     ebayListingStatus: (row.ebay_listing_status as ItemListing['ebayListingStatus']) ?? undefined,
+    ebayListingUrl: row.ebay_listing_url ?? undefined,
     photoUrl: row.photo_url ?? undefined,
     userImageUrl: row.user_image_url ?? undefined,
     preferredImageSource: (row.preferred_image_source as ItemListing['preferredImageSource']) ?? undefined,
@@ -97,6 +100,7 @@ function listingToRow(item: ItemListing, userId: string): ListingRow {
     notes: item.notes,
     ebay_exported_at: item.ebayExportedAt ?? null,
     ebay_listing_status: item.ebayListingStatus ?? null,
+    ebay_listing_url: item.ebayListingUrl ?? null,
     photo_url: item.photoUrl ?? null,
     user_image_url: item.userImageUrl ?? null,
     preferred_image_source: item.preferredImageSource ?? null,
@@ -128,6 +132,7 @@ function listingToUpdatePayload(item: ItemListing) {
     notes: item.notes,
     ebay_exported_at: item.ebayExportedAt ?? null,
     ebay_listing_status: item.ebayListingStatus ?? null,
+    ebay_listing_url: item.ebayListingUrl ?? null,
     photo_url: item.photoUrl ?? null,
     user_image_url: item.userImageUrl ?? null,
     preferred_image_source: item.preferredImageSource ?? null,

@@ -1,7 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Product, EbayCondition } from '@/types';
+import { toastReviewMessage, useToast } from '@/contexts/ToastContext';
+import { BatchProgressBanner } from './BatchProgressBanner';
 import { AmbiguousModal } from './AmbiguousModal';
 import { ProductReviewModal } from './ProductReviewModal';
 import {
@@ -38,21 +40,43 @@ export function ProductReviewFlow({
 }: ProductReviewFlowProps) {
   const [resolvedData, setResolvedData] = useState<ProductReviewData | null>(null);
   const [showDisambiguation, setShowDisambiguation] = useState(false);
+  const toast = useToast();
+  const lastReviewToastRef = useRef<string | null>(null);
 
   useEffect(() => {
     setResolvedData(null);
     setShowDisambiguation(false);
+    lastReviewToastRef.current = null;
   }, [data?.searchQuery, data?.variant, data?.photoUrl, data?.originalUpc, data?.originalSku]);
 
   const activeData = resolvedData ?? data;
 
+  useEffect(() => {
+    const message = activeData?.scanError || activeData?.lookupError;
+    if (!message || message === lastReviewToastRef.current) return;
+    lastReviewToastRef.current = message;
+    toastReviewMessage(toast, message);
+  }, [activeData?.scanError, activeData?.lookupError, toast]);
+
   const showExitToReview = queuedItemCount > 0 && onExitToReview;
   const showCancelSingle = !batchProgress && onCancelBatch;
   const showLoadingExit = showExitToReview || showCancelSingle;
+  const batchItemLabel = data?.variant === 'photo' ? 'Photo' : 'Entry';
+  const batchBanner = batchProgress && batchProgress.total > 1 ? (
+    <BatchProgressBanner
+      batchProgress={batchProgress}
+      itemLabel={batchItemLabel}
+      queuedItemCount={queuedItemCount}
+      onExitToReview={onExitToReview}
+      onCancelBatch={onCancelBatch}
+    />
+  ) : null;
 
   if (loading) {
     return (
-      <div className="modal-overlay modal-overlay--entry-review" role="status" aria-live="polite">
+      <>
+        {batchBanner}
+        <div className="modal-overlay modal-overlay--entry-review" role="status" aria-live="polite">
         <div className="modal modal--compact product-review-loading">
           <div className="spinner" />
           <p>{loadingMessage}</p>
@@ -72,17 +96,20 @@ export function ProductReviewFlow({
           )}
         </div>
       </div>
+      </>
     );
   }
 
-  if (!activeData) return null;
+  if (!activeData) return batchBanner;
 
   const disambiguationRequired = needsProductDisambiguation(activeData) || showDisambiguation;
   const ambiguousResults = activeData.ambiguousResults;
 
   if (disambiguationRequired && ambiguousResults?.length) {
     return (
-      <AmbiguousModal
+      <>
+        {batchBanner}
+        <AmbiguousModal
         query={activeData.searchQuery}
         results={ambiguousResults}
         onSelect={(product: Product) => {
@@ -96,14 +123,17 @@ export function ProductReviewFlow({
           }
           setShowDisambiguation(false);
         }}
-      />
+        />
+      </>
     );
   }
 
   const matchedProduct = activeData.matchedProduct ?? activeData.suggestedProduct ?? null;
 
   return (
-    <ProductReviewModal
+    <>
+      {batchBanner}
+      <ProductReviewModal
       key={`${activeData.variant}-${activeData.searchQuery}-${matchedProduct?.title ?? 'manual'}`}
       data={activeData}
       matchedProduct={matchedProduct}
@@ -120,5 +150,6 @@ export function ProductReviewFlow({
       batchProgress={batchProgress}
       onApplyConditionToRemaining={onApplyConditionToRemaining}
     />
+    </>
   );
 }

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { ItemListing } from '@/types';
 import { CSV_COLUMNS, buildCsvContent, downloadCsv } from '@/utils/csvExporter';
+import { isItemFoundWithProduct } from '@/utils/itemStatus';
 
 interface CsvExportModalProps {
   items: ItemListing[];
@@ -21,7 +22,7 @@ export function CsvExportModal({ items, onClose }: CsvExportModalProps) {
     return h;
   });
 
-  const exportable = items.filter(i => i.status === 'found' && i.product);
+  const exportable = items.filter(isItemFoundWithProduct);
 
   const toggleColumn = (id: string) => {
     setSelectedIds(prev =>

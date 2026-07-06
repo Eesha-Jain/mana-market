@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useItems } from '@/contexts/ItemsContext';
 import { getExportableItems } from '@/utils/ebayMapper';
+import { isItemPending } from '@/utils/itemStatus';
 import { BrandLink } from '@/components/ui/BrandLink';
 
 export function Navbar() {
@@ -13,7 +14,7 @@ export function Navbar() {
   const pathname = usePathname();
 
   const readyCount = getExportableItems(items).length;
-  const pendingCount = items.filter(i => i.status === 'idle' || i.status === 'searching').length;
+  const pendingCount = items.filter(isItemPending).length;
 
   return (
     <nav className="navbar">

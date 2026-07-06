@@ -2,6 +2,7 @@
 
 import { useRef, useState, type ChangeEvent } from 'react';
 import type { ImageCandidate, ImageCandidateSource } from '@/types';
+import { useToast } from '@/contexts/ToastContext';
 import { uploadProductImage } from '@/utils/imageUpload';
 
 const SOURCE_LABELS: Record<ImageCandidateSource, string> = {
@@ -71,7 +72,7 @@ export function ProductImagePicker({
   emptyMessage = 'No image found online — upload your own',
 }: ProductImagePickerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploadError, setUploadError] = useState('');
+  const toast = useToast();
   const [uploading, setUploading] = useState(false);
 
   const allCandidates = dedupeCandidates(candidates);
@@ -99,17 +100,16 @@ export function ProductImagePicker({
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      setUploadError('Please choose an image file.');
+      toast.error('Please choose an image file.');
       return;
     }
 
-    setUploadError('');
     setUploading(true);
     try {
       const url = await uploadProductImage(file);
       selectUser(url);
     } catch (err) {
-      setUploadError(err instanceof Error ? err.message : 'Upload failed');
+      toast.error(err instanceof Error ? err.message : 'Upload failed');
     } finally {
       setUploading(false);
     }
@@ -126,10 +126,6 @@ export function ProductImagePicker({
           <span className="product-image-picker-empty-icon" aria-hidden="true">📷</span>
           <p>{emptyMessage}</p>
         </div>
-      )}
-
-      {uploadError && (
-        <p className="form-error-banner product-image-picker-error">{uploadError}</p>
       )}
 
       {allCandidates.length > 0 && (

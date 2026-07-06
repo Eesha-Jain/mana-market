@@ -10,9 +10,11 @@ import {
   type ReactNode,
 } from 'react';
 import type { ItemListing, Product } from '../types';
-import { generateListingId } from '../types';
+import { generateListingId, ITEM_STATUS } from '../types';
 import { useAuth } from './AuthContext';
+import { useToast } from './ToastContext';
 import { useUserSettings } from './UserSettingsContext';
+import { resolveMarketPricePreference, type UserSettings } from '../utils/userSettings';
 import { isSupabaseConfigured, getAccessToken } from '@/lib/supabase/client';
 import {
   deleteAllListingsAction,
@@ -20,7 +22,7 @@ import {
   fetchListingsAction,
   insertListingAction,
   updateListingAction,
-} from '@/app/actions/listings';
+} from '@/lib/listings/actions';
 
 type Action =
   | { type: 'SET_ITEMS'; items: ItemListing[] }
@@ -43,10 +45,6 @@ function reducer(items: ItemListing[], action: Action): ItemListing[] {
 interface ItemsContextType {
   items: ItemListing[];
   isLoading: boolean;
-  syncError: string | null;
-  loadError: string | null;
-  clearSyncError: () => void;
-  clearLoadError: () => void;
   addItem: (query: string, source?: 'manual' | 'csv' | 'photo', overrides?: Partial<ItemListing>) => ItemListing;
   updateItem: (id: string, updates: Partial<ItemListing>) => void;
   removeItem: (id: string) => void;
@@ -106,7 +104,7 @@ function ensureListingFields(item: ItemListing): ItemListing {
 }
 
 function makeItem(
-  settings: { defaultMarketPricePreference: ItemListing['marketPricePreference'] },
+  settings: UserSettings,
   query: string,
   source: 'manual' | 'csv' | 'photo',
   overrides: Partial<ItemListing> = {},
@@ -115,14 +113,14 @@ function makeItem(
     id: crypto.randomUUID(),
     listingId: generateListingId(),
     query,
-    status: 'idle',
+    status: ITEM_STATUS.Idle,
     quantity: 1,
     condition: null,
     pricingMode: 'market',
     percentBelow: 10,
     manualPrice: 0,
     notes: '',
-    marketPricePreference: settings.defaultMarketPricePreference ?? 'ebay',
+    marketPricePreference: resolveMarketPricePreference(settings),
     source,
     createdAt: new Date().toISOString(),
     ...overrides,
@@ -132,10 +130,9 @@ function makeItem(
 export function ItemsProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const { settings } = useUserSettings();
+  const toast = useToast();
   const [items, setItems] = useState<ItemListing[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [syncError, setSyncError] = useState<string | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
   const itemsRef = useRef(items);
   itemsRef.current = items;
 
@@ -147,20 +144,15 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const clearSyncError = useCallback(() => setSyncError(null), []);
-  const clearLoadError = useCallback(() => setLoadError(null), []);
-
   useEffect(() => {
     if (!user) {
       dispatchItems({ type: 'CLEAR_ITEMS' });
       setIsLoading(false);
-      setLoadError(null);
       return;
     }
 
     if (isSupabaseConfigured()) {
       setIsLoading(true);
-      setLoadError(null);
       void getAccessToken()
         .then(async token => {
           if (!token) throw new Error('Not signed in');
@@ -168,7 +160,7 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
         })
         .then(loaded => dispatchItems({ type: 'SET_ITEMS', items: loaded.map(ensureListingFields) }))
         .catch(err => {
-          setLoadError(formatSyncError(err, 'load your listings'));
+          toast.error(formatSyncError(err, 'load your listings'));
         })
         .finally(() => setIsLoading(false));
       return;
@@ -187,10 +179,10 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
       }
     } catch {
       dispatchItems({ type: 'CLEAR_ITEMS' });
-      setLoadError('Could not read saved listings from this browser.');
+      toast.error('Could not read saved listings from this browser.');
     }
     setIsLoading(false);
-  }, [user?.id, dispatchItems]);
+  }, [user?.id, dispatchItems, toast]);
 
   useEffect(() => {
     if (!user || isSupabaseConfigured()) return;
@@ -208,7 +200,7 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
       void getAccessToken().then(token => {
         if (!token) return;
         void insertListingAction(token, item).catch(err => {
-          setSyncError(formatSyncError(err, 'save listing'));
+          toast.error(formatSyncError(err, 'save listing'));
         });
       });
     }
@@ -224,7 +216,7 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
         void getAccessToken().then(token => {
           if (!token) return;
           void updateListingAction(token, merged).catch(err => {
-            setSyncError(formatSyncError(err, 'update listing'));
+            toast.error(formatSyncError(err, 'update listing'));
           });
         });
       }
@@ -237,7 +229,7 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
       void getAccessToken().then(token => {
         if (!token) return;
         void deleteListingAction(token, id).catch(err => {
-          setSyncError(formatSyncError(err, 'delete listing'));
+          toast.error(formatSyncError(err, 'delete listing'));
         });
       });
     }
@@ -249,7 +241,7 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
       void getAccessToken().then(token => {
         if (!token) return;
         void deleteAllListingsAction(token).catch(err => {
-          setSyncError(formatSyncError(err, 'clear listings'));
+          toast.error(formatSyncError(err, 'clear listings'));
         });
       });
     }
@@ -260,10 +252,6 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
       value={{
         items,
         isLoading,
-        syncError,
-        loadError,
-        clearSyncError,
-        clearLoadError,
         addItem,
         updateItem,
         removeItem,

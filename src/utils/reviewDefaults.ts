@@ -3,7 +3,9 @@ import type { PricingMode } from '../types';
 import {
   describePricingMode,
   describeTextCaseFormat,
-  isDefaultConfigured,
+  isSettingConfigured,
+  resolveDescriptionCase,
+  resolveTitleCase,
   settingLabel,
   type UserSettingKey,
   type UserSettings,
@@ -32,8 +34,8 @@ export function collectReviewDefaultOffers(
 
   if (
     candidates.titleCase &&
-    !isDefaultConfigured(settings, 'titleCase') &&
-    candidates.titleCase !== settings.defaultTitleCase
+    !isSettingConfigured(settings, 'titleCase') &&
+    candidates.titleCase !== resolveTitleCase(settings)
   ) {
     offers.push({
       key: 'titleCase',
@@ -44,8 +46,8 @@ export function collectReviewDefaultOffers(
 
   if (
     candidates.descriptionCase &&
-    !isDefaultConfigured(settings, 'descriptionCase') &&
-    candidates.descriptionCase !== settings.defaultDescriptionCase
+    !isSettingConfigured(settings, 'descriptionCase') &&
+    candidates.descriptionCase !== resolveDescriptionCase(settings)
   ) {
     offers.push({
       key: 'descriptionCase',
@@ -56,7 +58,7 @@ export function collectReviewDefaultOffers(
 
   if (
     candidates.pricingMode &&
-    !isDefaultConfigured(settings, 'pricingMode') &&
+    !isSettingConfigured(settings, 'pricingMode') &&
     candidates.pricingMode !== initialPricing.pricingMode
   ) {
     offers.push({
@@ -69,7 +71,7 @@ export function collectReviewDefaultOffers(
   if (
     candidates.percentBelow != null &&
     candidates.pricingMode === 'percent_below' &&
-    !isDefaultConfigured(settings, 'percentBelow') &&
+    !isSettingConfigured(settings, 'percentBelow') &&
     candidates.percentBelow !== initialPricing.percentBelow
   ) {
     offers.push({
@@ -90,16 +92,16 @@ export function applyReviewDefaultOffers(
   const offerKeys = new Set(offers.map(o => o.key));
 
   if (offerKeys.has('titleCase') && candidates.titleCase) {
-    patch.defaultTitleCase = candidates.titleCase;
+    patch.titleCase = candidates.titleCase;
   }
   if (offerKeys.has('descriptionCase') && candidates.descriptionCase) {
-    patch.defaultDescriptionCase = candidates.descriptionCase;
+    patch.descriptionCase = candidates.descriptionCase;
   }
   if (offerKeys.has('pricingMode') && candidates.pricingMode) {
-    patch.defaultPricingMode = candidates.pricingMode;
+    patch.pricingMode = candidates.pricingMode;
   }
   if (offerKeys.has('percentBelow') && candidates.percentBelow != null) {
-    patch.defaultPercentBelow = candidates.percentBelow;
+    patch.percentBelow = candidates.percentBelow;
   }
 
   return patch;

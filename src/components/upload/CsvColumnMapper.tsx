@@ -39,7 +39,7 @@ export function CsvColumnMapper({
       </div>
 
       {mappingWarnings.length > 0 && (
-        <div className="form-error-banner csv-column-mapper-warnings" role="status">
+        <div className="form-warning-banner csv-column-mapper-warnings" role="status">
           {mappingWarnings.map(warning => (
             <p key={warning} style={{ margin: 0 }}>{warning}</p>
           ))}

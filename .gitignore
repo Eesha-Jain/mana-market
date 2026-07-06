@@ -11,6 +11,7 @@ node_modules
 dist
 .next
 *.local
+*.tsbuildinfo
 
 # Editor directories and files
 .vercel/*
@@ -26,14 +27,5 @@ dist
 *.sln
 *.sw?
 
-# Env (keep .env.test for Playwright local-auth builds)
+# Env
 .env*
-!.env.test
-
-# Vercel — never commit output/ or prebuilt artifacts (breaks deploys)
-.vercel
-
-# Playwright / TypeScript artifacts
-test-results/
-playwright-report/
-*.tsbuildinfo
