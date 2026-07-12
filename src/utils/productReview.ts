@@ -1,4 +1,4 @@
-import type { Product, EbayCondition, PricingMode, ImageCandidate, MarketPricePreference, MarketPriceSource } from '../types';
+import type { Product, ImageCandidate, ItemSource, PreferredImageSource, ListingCreatePayload, ReviewListingDefaults } from '../types';
 import type { EntryReviewDraft } from './entryReview';
 import { entryDraftPricingDefaults } from './entryReview';
 import type { PackParseResult } from './photoScanner';
@@ -24,38 +24,15 @@ export interface ProductReviewData {
   ambiguousResults: Product[] | null;
   lookupError?: string;
   scanError?: string;
-  initialQuantity: number;
-  initialCondition: EbayCondition | null;
-  initialPricingMode: PricingMode;
-  initialPercentBelow: number;
-  initialManualPrice: number;
-  source: 'manual' | 'csv' | 'photo';
+  initialQuantity: ReviewListingDefaults['quantity'];
+  initialCondition: ReviewListingDefaults['condition'];
+  initialPricingMode: ReviewListingDefaults['pricingMode'];
+  initialPercentBelow: ReviewListingDefaults['percentBelow'];
+  initialManualPrice: ReviewListingDefaults['manualPrice'];
+  source: ItemSource;
 }
 
-export interface ProductReviewConfirmPayload {
-  query: string;
-  source: 'manual' | 'csv' | 'photo';
-  customTitle?: string;
-  customDescription?: string;
-  originalUpc?: string;
-  originalSku?: string;
-  quantity: number;
-  condition: EbayCondition | null;
-  pricingMode: PricingMode;
-  percentBelow: number;
-  manualPrice: number;
-  marketPricePreference?: MarketPricePreference;
-  selectedMarketPriceSource?: MarketPriceSource;
-  product?: Product;
-  photoUrl?: string;
-  userImageUrl?: string;
-  preferredImageSource?: 'catalog' | 'user';
-  selectedImageUrl?: string;
-  parseMeta?: {
-    packType?: string;
-    cardCount?: string;
-  };
-}
+export type ProductReviewConfirmPayload = ListingCreatePayload;
 
 /** Build initial description from UPC, SKU, and optional import text. */
 export function buildInitialDescription(
@@ -74,7 +51,7 @@ export function buildInitialDescription(
 export function getReviewHeroImage(
   data: ProductReviewData,
   product: Product | null,
-  selection?: { selectedUrl?: string | null; preferredImageSource?: 'catalog' | 'user'; userImageUrl?: string },
+  selection?: { selectedUrl?: string | null; preferredImageSource?: PreferredImageSource; userImageUrl?: string },
 ): string | null {
   if (selection?.selectedUrl) return selection.selectedUrl;
   if (selection?.preferredImageSource === 'user') {

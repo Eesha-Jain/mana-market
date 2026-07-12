@@ -1,15 +1,11 @@
-import type { PricingMode } from '../types';
+import type { PricingCalculationInput } from '../types';
 
-export interface DraftPricingInput {
-  pricingMode: PricingMode;
-  percentBelow: number;
-  manualPrice: number;
-}
+export type { PricingCalculationInput } from '../types';
 
 /** Compute listing price from market data and pricing preferences (draft or saved item). */
 export function calculateDraftPrice(
   marketPrice: number | null,
-  pricing: DraftPricingInput,
+  pricing: PricingCalculationInput,
 ): number | null {
   if (pricing.pricingMode === 'manual') {
     return pricing.manualPrice > 0 ? pricing.manualPrice : null;

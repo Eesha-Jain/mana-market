@@ -33,7 +33,7 @@ export function MarketPriceSourceFields({
   if (readOnly) {
     if (!active.source && active.price == null) return null;
     return (
-      <p className="market-price-source-active text-muted text-sm">
+      <p className="market-price-source-active text-muted-sm">
         Market from {getMarketPriceSourceLabel(active.source ?? undefined, 'short')}
         {active.price != null ? ` · ${formatPrice(active.price)}` : ''}
       </p>
@@ -61,7 +61,7 @@ export function MarketPriceSourceFields({
       </label>
 
       {!showPicker && active.source && (
-        <p className="market-price-source-active text-muted text-sm">
+        <p className="market-price-source-active text-muted-sm">
           Using {getMarketPriceSourceLabel(active.source, 'short')}
           {active.price != null ? ` · ${formatPrice(active.price)}` : ''}
         </p>
@@ -84,10 +84,10 @@ export function MarketPriceSourceFields({
                   <strong>{getMarketPriceSourceLabel(option.source, 'short')}</strong>
                   <span>{formatPrice(option.price)}</span>
                   {option.soldCount != null && option.source === 'ebay_completed' && (
-                    <span className="text-muted text-sm">{option.soldCount} sold</span>
+                    <span className="text-muted-sm">{option.soldCount} sold</span>
                   )}
                   {option.priceRange && (
-                    <span className="text-muted text-sm">
+                    <span className="text-muted-sm">
                       ${option.priceRange.low.toFixed(2)}–${option.priceRange.high.toFixed(2)}
                     </span>
                   )}

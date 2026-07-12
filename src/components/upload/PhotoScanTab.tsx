@@ -9,6 +9,7 @@ import { buildPhotoReviewData } from '@/utils/photoReview';
 import { persistPhotoScanImage } from '@/utils/imageUpload';
 import { ProductReviewFlow } from '@/components/review/ProductReviewFlow';
 import { PhotoCaptureTargetSelector } from './PhotoCaptureTargetSelector';
+import { PhotoCaptureActions } from './PhotoCaptureActions';
 import { SaveDefaultPrompt, type DefaultSaveOffer } from '@/components/ui/SaveDefaultPrompt';
 import type { ProductReviewConfirmPayload, ProductReviewData } from '@/utils/productReview';
 import type { EbayCondition } from '@/types';
@@ -479,32 +480,14 @@ export function PhotoScanTab() {
       {scanMode === 'single' && (
         <div className="photo-scan-area">
           {!previewUrl ? (
-            <div className="photo-scan-actions">
-              <div className="photo-scan-cta-row">
-                <button
-                  type="button"
-                  className="photo-scan-cta photo-scan-cta--primary"
-                  onClick={() => openCamera(singleCameraRef)}
-                >
-                  <span className="photo-scan-cta-icon">📸</span>
-                  <span className="photo-scan-cta-label">Take photo</span>
-                </button>
-                <button
-                  type="button"
-                  className="photo-scan-cta"
-                  onClick={() => {
-                    if (!ensureCaptureTarget()) return;
-                    singleFileRef.current?.click();
-                  }}
-                >
-                  <span className="photo-scan-cta-icon">🖼️</span>
-                  <span className="photo-scan-cta-label">Choose from library</span>
-                </button>
-              </div>
-              <p className="text-muted text-sm photo-scan-cta-hint">{captureHint}</p>
-              <input ref={singleFileRef} type="file" accept="image/*" className="sr-only" onChange={handleSingleFile} />
-              <input ref={singleCameraRef} type="file" accept="image/*" capture="environment" className="sr-only" onChange={handleSingleFile} />
-            </div>
+            <PhotoCaptureActions
+              onTakePhoto={() => openCamera(singleCameraRef)}
+              onChooseLibrary={() => {
+                if (!ensureCaptureTarget()) return;
+                singleFileRef.current?.click();
+              }}
+              hint={captureHint}
+            />
           ) : (
             <div className="photo-scan-preview">
               <img src={previewUrl} alt="Product preview" className="photo-scan-image" />
@@ -524,34 +507,25 @@ export function PhotoScanTab() {
               )}
             </div>
           )}
+          {!previewUrl && (
+            <>
+              <input ref={singleFileRef} type="file" accept="image/*" className="sr-only" onChange={handleSingleFile} />
+              <input ref={singleCameraRef} type="file" accept="image/*" capture="environment" className="sr-only" onChange={handleSingleFile} />
+            </>
+          )}
         </div>
       )}
 
       {showBulkCollecting && (
         <div className="photo-bulk-collect">
-          <div className="photo-scan-actions">
-            <div className="photo-scan-cta-row">
-              <button
-                type="button"
-                className="photo-scan-cta photo-scan-cta--primary"
-                onClick={() => openCamera(bulkCameraRef)}
-              >
-                <span className="photo-scan-cta-icon">📸</span>
-                <span className="photo-scan-cta-label">Take photo</span>
-              </button>
-              <button
-                type="button"
-                className="photo-scan-cta"
-                onClick={() => {
-                  if (!ensureCaptureTarget()) return;
-                  bulkFileRef.current?.click();
-                }}
-              >
-                <span className="photo-scan-cta-icon">🖼️</span>
-                <span className="photo-scan-cta-label">Add from library</span>
-              </button>
-            </div>
-          </div>
+          <PhotoCaptureActions
+            onTakePhoto={() => openCamera(bulkCameraRef)}
+            onChooseLibrary={() => {
+              if (!ensureCaptureTarget()) return;
+              bulkFileRef.current?.click();
+            }}
+            libraryLabel="Add from library"
+          />
 
           {pendingPhotos.length > 0 ? (
             <>
@@ -581,7 +555,7 @@ export function PhotoScanTab() {
               </div>
             </>
           ) : (
-            <p className="text-muted text-sm photo-bulk-empty">
+            <p className="text-muted-sm photo-bulk-empty">
               Add photos with the camera or pick several from your library, then click Done to review each one.
             </p>
           )}

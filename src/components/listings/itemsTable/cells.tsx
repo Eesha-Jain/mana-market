@@ -1,9 +1,8 @@
 'use client';
 
 import type { MouseEvent } from 'react';
-import type { ItemListing, EbayCondition, PricingMode } from '@/types';
+import type { ItemListing } from '@/types';
 import {
-  EBAY_CONDITIONS,
   getDetectedTitle,
   getItemImageUrl,
   getItemListingDescription,
@@ -20,6 +19,8 @@ import {
   getItemMarketPrice,
 } from '@/utils/ebayMapper';
 import { ItemStatusBadge } from '../ItemStatusBadge';
+import { ConditionQuantityFields } from '../ConditionQuantityFields';
+import { ListingPricingFields } from '../ListingPricingFields';
 import type { ItemTableContext } from './types';
 
 export function stopRowClick(e: MouseEvent) {
@@ -182,7 +183,7 @@ export function ReviewProductCell({ item, ctx }: { item: ItemListing; ctx: ItemT
         title="Edit listing title"
       />
       {item.customTitle && item.customTitle !== getDetectedTitle(item) && (
-        <span className="text-muted text-sm" style={{ fontSize: '0.72rem' }}>
+        <span className="text-muted-sm" style={{ fontSize: '0.72rem' }}>
           Was: {getDetectedTitle(item)}
         </span>
       )}
@@ -204,35 +205,27 @@ export function ReviewProductCell({ item, ctx }: { item: ItemListing; ctx: ItemT
 export function ReviewConditionCell({ item, ctx }: { item: ItemListing; ctx: ItemTableContext }) {
   const update = itemUpdate(ctx, item);
   return (
-    <select
-      className={`inline-select${!item.condition ? ' inline-select--required' : ''}`}
-      value={item.condition ?? ''}
-      onChange={e =>
-        update({
-          condition: e.target.value ? (e.target.value as EbayCondition) : null,
-        })
-      }
-    >
-      <option value="">Select…</option>
-      {EBAY_CONDITIONS.map(c => (
-        <option key={c.id} value={c.label} title={c.mtgEquivalent}>
-          {c.label}
-        </option>
-      ))}
-    </select>
+    <ConditionQuantityFields
+      variant="inline"
+      fields={['condition']}
+      condition={item.condition}
+      quantity={item.quantity}
+      onConditionChange={condition => update({ condition })}
+      onQuantityChange={() => {}}
+    />
   );
 }
 
 export function ReviewQuantityCell({ item, ctx }: { item: ItemListing; ctx: ItemTableContext }) {
   const update = itemUpdate(ctx, item);
   return (
-    <input
-      type="number"
-      className="inline-input inline-input--sm"
-      min={1}
-      max={999}
-      value={item.quantity}
-      onChange={e => update({ quantity: Math.max(1, parseInt(e.target.value, 10) || 1) })}
+    <ConditionQuantityFields
+      variant="inline"
+      fields={['quantity']}
+      condition={item.condition}
+      quantity={item.quantity}
+      onConditionChange={() => {}}
+      onQuantityChange={quantity => update({ quantity })}
     />
   );
 }
@@ -246,12 +239,12 @@ export function ReviewMarketCell({ item }: { item: ItemListing }) {
     <>
       <span>{formatPrice(market)}</span>
       {marketSelection.source && (
-        <span className="text-muted text-sm" style={{ display: 'block', fontSize: '0.72rem' }}>
+        <span className="text-muted-sm" style={{ display: 'block', fontSize: '0.72rem' }}>
           {getMarketPriceSourceLabel(marketSelection.source, 'short')}
         </span>
       )}
       {product?.priceRange && (
-        <span className="text-muted text-sm" style={{ display: 'block', fontSize: '0.72rem' }}>
+        <span className="text-muted-sm" style={{ display: 'block', fontSize: '0.72rem' }}>
           ${product.priceRange.low}–${product.priceRange.high}
         </span>
       )}
@@ -262,48 +255,17 @@ export function ReviewMarketCell({ item }: { item: ItemListing }) {
 export function ReviewPricingCell({ item, ctx }: { item: ItemListing; ctx: ItemTableContext }) {
   const update = itemUpdate(ctx, item);
   return (
-    <div className="pricing-controls">
-      <select
-        className="inline-select"
-        value={item.pricingMode}
-        onChange={e => update({ pricingMode: e.target.value as PricingMode })}
-      >
-        <option value="market">Market</option>
-        <option value="percent_below">% below</option>
-        <option value="manual">Manual</option>
-      </select>
-      {item.pricingMode === 'percent_below' && (
-        <div className="percent-input-row">
-          <input
-            type="number"
-            className="inline-input inline-input--sm"
-            min={1}
-            max={99}
-            value={item.percentBelow}
-            onChange={e =>
-              update({
-                percentBelow: Math.min(99, Math.max(1, parseInt(e.target.value, 10) || 0)),
-              })
-            }
-          />
-          <span className="text-muted">%</span>
-        </div>
-      )}
-      {item.pricingMode === 'manual' && (
-        <div className="manual-input-row">
-          <span className="text-muted">$</span>
-          <input
-            type="number"
-            className="inline-input inline-input--sm"
-            min={0.01}
-            step={0.01}
-            value={item.manualPrice || ''}
-            placeholder="0.00"
-            onChange={e => update({ manualPrice: parseFloat(e.target.value) || 0 })}
-          />
-        </div>
-      )}
-    </div>
+    <ListingPricingFields
+      variant="inline"
+      marketPrice={getItemMarketPrice(item)}
+      pricingMode={item.pricingMode}
+      percentBelow={item.percentBelow}
+      manualPrice={item.manualPrice}
+      finalPrice={calculatePrice(item)}
+      onPricingModeChange={pricingMode => update({ pricingMode })}
+      onPercentBelowChange={percentBelow => update({ percentBelow })}
+      onManualPriceChange={manualPrice => update({ manualPrice })}
+    />
   );
 }
 

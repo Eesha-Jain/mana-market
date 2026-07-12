@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState, type ChangeEvent } from 'react';
-import type { ImageCandidate, ImageCandidateSource } from '@/types';
+import type { ImageCandidate, ImageCandidateSource, PreferredImageSource } from '@/types';
 import { useToast } from '@/contexts/ToastContext';
 import { uploadProductImage } from '@/utils/imageUpload';
 
@@ -15,7 +15,7 @@ const SOURCE_LABELS: Record<ImageCandidateSource, string> = {
 export interface ProductImageSelection {
   selectedUrl: string | null;
   userImageUrl?: string;
-  preferredImageSource: 'catalog' | 'user';
+  preferredImageSource: PreferredImageSource;
 }
 
 interface ProductImagePickerProps {

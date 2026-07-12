@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Product, EbayCondition } from '@/types';
 import { toastReviewMessage, useToast } from '@/contexts/ToastContext';
 import { BatchProgressBanner } from './BatchProgressBanner';
+import { BatchExitActions } from './BatchExitActions';
 import { AmbiguousModal } from './AmbiguousModal';
 import { ItemModal } from '@/components/listings/ItemModal';
 import { Modal } from '@/components/ui/Modal';
@@ -92,18 +93,14 @@ export function ProductReviewFlow({
           <div className="spinner" />
           <p>{loadingMessage}</p>
           {showLoadingExit && (
-            <div className="product-review-exit-actions">
-              {showExitToReview && (
-                <button type="button" className="btn-link btn-sm" onClick={onExitToReview}>
-                  Review all {queuedItemCount} item{queuedItemCount !== 1 ? 's' : ''} →
-                </button>
-              )}
-              {showCancelSingle && (
-                <button type="button" className="btn-ghost btn-sm" onClick={onCancelBatch}>
-                  Cancel
-                </button>
-              )}
-            </div>
+            <BatchExitActions
+              className="product-review-exit-actions"
+              queuedItemCount={queuedItemCount}
+              onExitToReview={showExitToReview ? onExitToReview : undefined}
+              onCancel={showCancelSingle ? onCancelBatch : undefined}
+              cancelLabel="Cancel"
+              cancelVariant="ghost"
+            />
           )}
         </Modal>
       </>

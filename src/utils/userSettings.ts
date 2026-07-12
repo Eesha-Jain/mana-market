@@ -1,4 +1,4 @@
-import type { PricingMode, MarketPricePreference } from '../types';
+import type { PricingMode, MarketPricePreference, DefaultPricingDraft } from '../types';
 import type { TextCaseFormat } from './textCase';
 import { normalizeTextCaseFormat } from './textCase';
 
@@ -265,16 +265,12 @@ export function describeMarketPricePreference(preference: MarketPricePreference)
   return MARKET_PRICE_PREFERENCE_OPTIONS.find(o => o.value === preference)?.label ?? preference;
 }
 
-export interface DraftPricingInput {
-  manualPrice: number;
-  pricingMode?: PricingMode;
-  percentBelow?: number;
-}
+export type { DefaultPricingDraft } from '../types';
 
 /** Resolve pricing fields for a new listing, honoring user defaults and CSV price imports. */
 export function resolveDefaultPricing(
   settings: UserSettings,
-  draft: DraftPricingInput,
+  draft: DefaultPricingDraft,
 ): { pricingMode: PricingMode; percentBelow: number; manualPrice: number } {
   const hasImportManualPrice = draft.manualPrice > 0;
 

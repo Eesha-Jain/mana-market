@@ -1,203 +1,26 @@
 import 'server-only';
 
-import { serverEnv } from '@/lib/env/server';
-
-// ─── UPC / Barcode lookup (UPCitemdb — 100/day, no key) ─────────────────────
-
-interface UpcOffer {
-  price?: string;
-}
-
-interface UpcItem {
-  title?: string;
-  description?: string;
-  brand?: string;
-  images?: string[];
-  upc?: string;
-  offers?: UpcOffer[];
-  lowest_recorded_price?: number | null;
-  highest_recorded_price?: number | null;
-}
-
-interface UpcData {
-  title: string | null;
-  description: string;
-  brand: string;
-  imageUrls: string[];
-  upc: string;
-  lowestPrice: number | null;
-  highestPrice: number | null;
-  avgOfferPrice: number | null;
-}
-
-interface ImageCandidate {
-  url: string;
-  source: string;
-}
-
-interface PriceRange {
-  low: number;
-  high: number;
-}
-
-interface MarketPriceOption {
-  source: string;
-  price: number;
-  priceRange?: PriceRange | null;
-  soldCount?: number | null;
-}
-
-interface SearchProduct {
-  title: string;
-  description: string;
-  brand: string;
-  imageUrls: string[];
-  imageCandidates: ImageCandidate[];
-  upc: string | null;
-  marketPrice: number | null;
-  marketPriceSource: string | null;
-  marketPriceOptions: MarketPriceOption[] | null;
-  priceRange?: PriceRange | null;
-  soldCount?: number | null;
-  ebaySearchUrl: string;
-  tcgplayerUrl: string;
-}
-
-interface EbayAgg {
-  avgPrice: number;
-  soldCount: number;
-  topTitle: string | null;
-  topImageUrl: string | null;
-  priceRange: PriceRange;
-}
-
-type EbayRawItem = Record<string, unknown>;
-
-async function lookupUPC(upc: string): Promise<UpcData | null> {
-  if (!upc || !/^\d{8,14}$/.test(upc)) return null;
-  try {
-    const res = await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${upc}`, {
-      headers: { Accept: 'application/json' },
-    });
-    if (!res.ok) return null;
-    const data = (await res.json()) as { items?: UpcItem[] };
-    if (!data.items?.length) return null;
-    const item = data.items[0]!;
-
-    const prices = (item.offers || [])
-      .map(o => parseFloat(o.price ?? ''))
-      .filter(p => !isNaN(p) && p > 0);
-    const avgOfferPrice = prices.length
-      ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length * 100) / 100
-      : null;
-
-    return {
-      title: item.title || null,
-      description: item.description || '',
-      brand: item.brand || '',
-      imageUrls: item.images || [],
-      upc: item.upc || upc,
-      lowestPrice: item.lowest_recorded_price ?? null,
-      highestPrice: item.highest_recorded_price ?? null,
-      avgOfferPrice,
-    };
-  } catch {
-    return null;
-  }
-}
-
-// ─── eBay Finding API (completed sold listings) ────────────────────────────────
-
-function firstString(value: unknown): string | null {
-  if (Array.isArray(value) && typeof value[0] === 'string') return value[0];
-  return null;
-}
-
-function nestedFirstString(obj: unknown, ...keys: string[]): string | null {
-  let current: unknown = obj;
-  for (const key of keys) {
-    if (!current || typeof current !== 'object') return null;
-    current = (current as Record<string, unknown>)[key];
-  }
-  if (Array.isArray(current) && current[0] && typeof current[0] === 'object') {
-    const inner = current[0] as Record<string, unknown>;
-    const val = inner['__value__'];
-    return typeof val === 'string' ? val : null;
-  }
-  return null;
-}
-
-function parseEbayItem(raw: EbayRawItem) {
-  const title = firstString(raw.title);
-  const priceStr = nestedFirstString(raw, 'sellingStatus', 'currentPrice');
-  const price = parseFloat(priceStr ?? '');
-  const imageUrl =
-    firstString(raw.pictureURLLarge) ||
-    firstString(raw.galleryURL) ||
-    null;
-  return { title, price: !isNaN(price) && price > 0 ? price : null, imageUrl };
-}
-
-async function fetchEbayItems(keywords: string): Promise<EbayRawItem[]> {
-  const appId = serverEnv('EBAY_APP_ID');
-  if (!appId || !keywords) return [];
-
-  const searchTerm = `${keywords} magic the gathering`;
-
-  const params = new URLSearchParams({
-    'OPERATION-NAME': 'findCompletedItems',
-    'SERVICE-VERSION': '1.0.0',
-    'SECURITY-APPNAME': appId,
-    'RESPONSE-DATA-FORMAT': 'JSON',
-    sortOrder: 'EndTimeSoonest',
-    'paginationInput.entriesPerPage': '25',
-    outputSelector: 'PictureURLLarge',
-    keywords: searchTerm,
-    'itemFilter(0).name': 'SoldItemsOnly',
-    'itemFilter(0).value': 'true',
-  });
-
-  try {
-    const res = await fetch(
-      `https://svcs.ebay.com/services/search/FindingService/v1?${params}`,
-    );
-    if (!res.ok) return [];
-    const data = (await res.json()) as {
-      findCompletedItemsResponse?: Array<{
-        searchResult?: Array<{ item?: EbayRawItem[] }>;
-      }>;
-    };
-    return data?.findCompletedItemsResponse?.[0]?.searchResult?.[0]?.item || [];
-  } catch {
-    return [];
-  }
-}
-
-// ─── Image enrichment helpers ─────────────────────────────────────────────────
-
-function uniqueUrls(urls: (string | null | undefined)[] | undefined): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const url of urls || []) {
-    if (!url || seen.has(url)) continue;
-    seen.add(url);
-    out.push(url);
-  }
-  return out;
-}
+import type {
+  ImageCandidate,
+  ImageCandidateSource,
+  MarketPriceOption,
+  MarketPriceSource,
+  PriceRange,
+  Product,
+} from '@/types';
+import {
+  aggregateEbayPricing,
+  collectEbayImages,
+  fetchEbayItems,
+  parseEbayItem,
+  uniqueUrls,
+  type EbayAgg,
+  type EbayRawItem,
+} from '@/lib/search/ebayClient';
+import { lookupUPC, type UpcData } from '@/lib/search/upcLookup';
 
 function mergeImageUrls(...lists: Array<(string | null | undefined)[] | undefined>): string[] {
   return uniqueUrls(lists.flat().filter(Boolean) as (string | null | undefined)[]);
-}
-
-function collectEbayImages(rawItems: EbayRawItem[], limit = 12): string[] {
-  const urls: string[] = [];
-  for (const raw of rawItems) {
-    const { imageUrl } = parseEbayItem(raw);
-    if (imageUrl) urls.push(imageUrl);
-    if (urls.length >= limit) break;
-  }
-  return uniqueUrls(urls);
 }
 
 function buildImageCandidates(upcImages: string[] | undefined, ebayImages: string[]): ImageCandidate[] {
@@ -207,19 +30,19 @@ function buildImageCandidates(upcImages: string[] | undefined, ebayImages: strin
   for (const url of upcImages || []) {
     if (!url || seen.has(url)) continue;
     seen.add(url);
-    candidates.push({ url, source: 'upc_catalog' });
+    candidates.push({ url, source: 'upc_catalog' satisfies ImageCandidateSource });
   }
 
   for (const url of ebayImages) {
     if (!url || seen.has(url)) continue;
     seen.add(url);
-    candidates.push({ url, source: 'ebay_sold' });
+    candidates.push({ url, source: 'ebay_sold' satisfies ImageCandidateSource });
   }
 
   return candidates;
 }
 
-function enrichProductImages(product: SearchProduct, upcData: UpcData | null, allEbayImages: string[]): void {
+function enrichProductImages(product: Product, upcData: UpcData | null, allEbayImages: string[]): void {
   product.imageUrls = mergeImageUrls(
     upcData?.imageUrls,
     product.imageUrls,
@@ -230,7 +53,7 @@ function enrichProductImages(product: SearchProduct, upcData: UpcData | null, al
 
 function attachSearchMetadata(result: Record<string, unknown>): Record<string, unknown> {
   if (result.type === 'found') {
-    const product = result.product as SearchProduct;
+    const product = result.product as Product;
     const missingFields = product.imageUrls.length ? [] : ['image'];
     return {
       ...result,
@@ -240,7 +63,7 @@ function attachSearchMetadata(result: Record<string, unknown>): Record<string, u
   }
 
   if (result.type === 'ambiguous') {
-    const results = result.results as SearchProduct[];
+    const results = result.results as Product[];
     const missingFields = results.some(p => p.imageUrls.length) ? [] : ['image'];
     return {
       ...result,
@@ -262,8 +85,8 @@ function buildMarketPriceOptions(upcData: UpcData | null, ebayAgg: EbayAgg | nul
     options.push({
       source: 'ebay_completed',
       price: ebayAgg.avgPrice,
-      priceRange: ebayAgg.priceRange ?? null,
-      soldCount: ebayAgg.soldCount ?? null,
+      priceRange: ebayAgg.priceRange,
+      soldCount: ebayAgg.soldCount,
     });
   }
 
@@ -273,7 +96,7 @@ function buildMarketPriceOptions(upcData: UpcData | null, ebayAgg: EbayAgg | nul
       price: upcData.avgOfferPrice,
       priceRange: upcData.lowestPrice != null
         ? { low: upcData.lowestPrice, high: upcData.highestPrice || upcData.lowestPrice }
-        : null,
+        : undefined,
     });
   } else if (upcData?.lowestPrice != null) {
     options.push({
@@ -289,12 +112,12 @@ function buildMarketPriceOptions(upcData: UpcData | null, ebayAgg: EbayAgg | nul
   return options;
 }
 
-function applyPrimaryMarketPrice(product: SearchProduct, options: MarketPriceOption[]): void {
+function applyPrimaryMarketPrice(product: Product, options: MarketPriceOption[]): void {
   product.marketPriceOptions = options;
 
   if (!options.length) {
-    product.marketPrice = null;
-    product.marketPriceSource = null;
+    product.marketPrice = undefined;
+    product.marketPriceSource = undefined;
     return;
   }
 
@@ -312,14 +135,14 @@ interface BuildProductInput {
   imageUrls?: string[];
   upc?: string | null;
   marketPrice?: number | null;
-  marketPriceSource?: string | null;
+  marketPriceSource?: MarketPriceSource | null;
   marketPriceOptions?: MarketPriceOption[] | null;
   priceRange?: PriceRange | null;
   soldCount?: number | null;
   query: string;
 }
 
-function buildProductFromSources(input: BuildProductInput): SearchProduct {
+function buildProductFromSources(input: BuildProductInput): Product {
   const {
     title,
     description,
@@ -335,18 +158,18 @@ function buildProductFromSources(input: BuildProductInput): SearchProduct {
   } = input;
   const displayTitle = title || query;
   const urls = (imageUrls || []).filter(Boolean);
-  const product: SearchProduct = {
+  const product: Product = {
     title: displayTitle,
     description: description || '',
     brand: brand || 'Wizards of the Coast',
     imageUrls: urls,
-    imageCandidates: urls.map(url => ({ url, source: 'ebay_sold' })),
-    upc: upc || null,
-    marketPrice: marketPrice ?? null,
-    marketPriceSource: marketPriceSource ?? null,
-    marketPriceOptions: marketPriceOptions || null,
-    priceRange,
-    soldCount,
+    imageCandidates: urls.map(url => ({ url, source: 'ebay_sold' satisfies ImageCandidateSource })),
+    upc: upc || undefined,
+    marketPrice: marketPrice ?? undefined,
+    marketPriceSource: marketPriceSource ?? undefined,
+    marketPriceOptions: marketPriceOptions ?? undefined,
+    priceRange: priceRange ?? undefined,
+    soldCount: soldCount ?? undefined,
     ebaySearchUrl: `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(displayTitle + ' magic the gathering')}`,
     tcgplayerUrl: `https://www.tcgplayer.com/search/magic/product?q=${encodeURIComponent(displayTitle)}`,
   };
@@ -358,9 +181,9 @@ function buildProductFromSources(input: BuildProductInput): SearchProduct {
   return product;
 }
 
-function ebayItemsToProducts(ebayRawItems: EbayRawItem[], upcData: UpcData | null, query: string): SearchProduct[] {
+function ebayItemsToProducts(ebayRawItems: EbayRawItem[], upcData: UpcData | null, query: string): Product[] {
   const seen = new Set<string>();
-  const products: SearchProduct[] = [];
+  const products: Product[] = [];
   const sharedEbayImages = collectEbayImages(ebayRawItems);
 
   for (const raw of ebayRawItems) {
@@ -398,26 +221,7 @@ function ebayItemsToProducts(ebayRawItems: EbayRawItem[], upcData: UpcData | nul
   return products;
 }
 
-function aggregateEbayPricing(ebayRawItems: EbayRawItem[]): EbayAgg | null {
-  const prices = ebayRawItems
-    .map(i => parseEbayItem(i).price)
-    .filter((p): p is number => p !== null);
-
-  if (!prices.length) return null;
-
-  const avgPrice = Math.round(prices.reduce((a, b) => a + b, 0) / prices.length * 100) / 100;
-  const top = parseEbayItem(ebayRawItems[0]!);
-
-  return {
-    avgPrice,
-    soldCount: prices.length,
-    topTitle: top.title,
-    topImageUrl: top.imageUrl,
-    priceRange: { low: Math.min(...prices), high: Math.max(...prices) },
-  };
-}
-
-function buildProductFromUpcData(upcData: UpcData, ebayAgg: EbayAgg | null, query: string): SearchProduct {
+function buildProductFromUpcData(upcData: UpcData, ebayAgg: EbayAgg | null, query: string): Product {
   const marketPriceOptions = buildMarketPriceOptions(upcData, ebayAgg);
 
   const product = buildProductFromSources({
@@ -461,9 +265,9 @@ function titlesDiverge(a: string, b: string): boolean {
   return overlap < 2;
 }
 
-function dedupeSearchProducts(products: SearchProduct[]): SearchProduct[] {
+function dedupeProducts(products: Product[]): Product[] {
   const seen = new Set<string>();
-  const out: SearchProduct[] = [];
+  const out: Product[] = [];
   for (const product of products) {
     const key = product.title.toLowerCase().trim();
     if (seen.has(key)) continue;
@@ -474,7 +278,7 @@ function dedupeSearchProducts(products: SearchProduct[]): SearchProduct[] {
 }
 
 /** Rank/filter listing titles using a secondary hint (SKU or product name). */
-export function narrowProductsByHint(products: SearchProduct[], hint: string | undefined): SearchProduct[] {
+export function narrowProductsByHint(products: Product[], hint: string | undefined): Product[] {
   const needle = (hint || '').trim().toLowerCase();
   if (!needle || !products.length) return products;
 
@@ -490,7 +294,7 @@ export function narrowProductsByHint(products: SearchProduct[], hint: string | u
 }
 
 function finalizeEbayProducts(
-  ebayProducts: SearchProduct[],
+  ebayProducts: Product[],
   ebayAgg: EbayAgg | null,
   upc: string | undefined,
   upcData: UpcData | null,
@@ -539,7 +343,7 @@ interface EbayRun {
   term: string;
   rawItems: EbayRawItem[];
   agg: EbayAgg | null;
-  products: SearchProduct[];
+  products: Product[];
 }
 
 async function runEbaySearch(term: string, secondary: string | null, upcData: UpcData | null): Promise<EbayRun | null> {
@@ -594,7 +398,7 @@ export async function searchItem(query: string, upc?: string, sku?: string): Pro
 
     const ebayProducts = bestRun?.products ?? [];
     if (ebayProducts.length > 1) {
-      const results = dedupeSearchProducts([product, ...ebayProducts]);
+      const results = dedupeProducts([product, ...ebayProducts]);
       if (results.length > 1) {
         return attachSearchMetadata({ type: 'ambiguous', source: 'upc+ebay', results });
       }
@@ -607,7 +411,7 @@ export async function searchItem(query: string, upc?: string, sku?: string): Pro
         return attachSearchMetadata({
           type: 'ambiguous',
           source: 'upc+ebay',
-          results: dedupeSearchProducts([product, ebayProduct]),
+          results: dedupeProducts([product, ebayProduct]),
         });
       }
     }
@@ -619,9 +423,9 @@ export async function searchItem(query: string, upc?: string, sku?: string): Pro
     const result = finalizeEbayProducts(bestRun.products, bestRun.agg, upc, upcData);
     if (result) {
       if (result.type === 'found') {
-        enrichProductImages(result.product as SearchProduct, upcData, allEbayImages);
+        enrichProductImages(result.product as Product, upcData, allEbayImages);
       } else {
-        for (const product of result.results as SearchProduct[]) {
+        for (const product of result.results as Product[]) {
           enrichProductImages(product, upcData, allEbayImages);
         }
       }
@@ -634,9 +438,9 @@ export async function searchItem(query: string, upc?: string, sku?: string): Pro
       const result = finalizeEbayProducts(run.products, run.agg, upc, upcData);
       if (result) {
         if (result.type === 'found') {
-          enrichProductImages(result.product as SearchProduct, upcData, allEbayImages);
+          enrichProductImages(result.product as Product, upcData, allEbayImages);
         } else {
-          for (const product of result.results as SearchProduct[]) {
+          for (const product of result.results as Product[]) {
             enrichProductImages(product, upcData, allEbayImages);
           }
         }

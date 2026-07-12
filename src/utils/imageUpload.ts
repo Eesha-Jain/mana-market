@@ -1,3 +1,4 @@
+import type { PreferredImageSource } from '@/types';
 import { getSupabase, isSupabaseConfigured, LISTING_IMAGES_BUCKET } from '@/lib/supabase/client';
 
 export { isPersistentImageUrl } from './imageUrl';
@@ -21,7 +22,7 @@ function resolveExtension(file: File): string {
 export async function persistPhotoScanImage(
   photoUrl: string | undefined,
   sourceFile: File | undefined,
-): Promise<{ photoUrl?: string; userImageUrl?: string; preferredImageSource?: 'catalog' | 'user' }> {
+): Promise<{ photoUrl?: string; userImageUrl?: string; preferredImageSource?: PreferredImageSource }> {
   const needsUpload =
     (photoUrl?.startsWith('blob:') || photoUrl?.startsWith('data:')) && sourceFile;
 

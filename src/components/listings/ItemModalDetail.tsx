@@ -150,7 +150,7 @@ export function ItemModalDetail({
             )}
           </dl>
           {product.description && (
-            <p className="text-muted text-sm">{product.description}</p>
+            <p className="text-muted-sm">{product.description}</p>
           )}
           {product.imageUrls.length > 1 && (
             <div className="item-detail-gallery">
@@ -180,14 +180,14 @@ export function ItemModalDetail({
     <div className="ebay-status-box">
       <strong>On eBay</strong>
       {item.ebayExportedAt ? (
-        <p className="text-muted text-sm">
+        <p className="text-muted-sm">
           Exported from Mana Market · {new Date(item.ebayExportedAt).toLocaleString()}
         </p>
       ) : (
-        <p className="text-muted text-sm">Marked as listed outside this app</p>
+        <p className="text-muted-sm">Marked as listed outside this app</p>
       )}
       {item.ebayListingStatus && (
-        <p className="text-muted text-sm">Status: {item.ebayListingStatus}</p>
+        <p className="text-muted-sm">Status: {item.ebayListingStatus}</p>
       )}
       {ebayUrl ? (
         <a
@@ -199,7 +199,7 @@ export function ItemModalDetail({
           View listing on eBay ↗
         </a>
       ) : (
-        <p className="text-muted text-sm">No listing URL saved</p>
+        <p className="text-muted-sm">No listing URL saved</p>
       )}
       <a
         href={EBAY_SELLER_ACTIVE_LISTINGS_URL}
@@ -264,7 +264,7 @@ export function ItemModalDetail({
             Reset to detected title
           </button>
         ) : !readOnly ? (
-          <span className="text-muted text-sm">
+          <span className="text-muted-sm">
             Detected: {getDetectedTitle(item)}
           </span>
         ) : undefined
@@ -274,7 +274,7 @@ export function ItemModalDetail({
       descriptionPlaceholder={product?.description || 'Product description…'}
       descriptionHint={
         !readOnly && !getItemListingDescription(item) && product?.description ? (
-          <span className="text-muted text-sm">Using detected description</span>
+          <span className="text-muted-sm">Using detected description</span>
         ) : undefined
       }
       conditionQuantitySection={conditionQuantitySection}

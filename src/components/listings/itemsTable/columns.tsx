@@ -147,7 +147,7 @@ export const EXPORTED_TABLE_CONFIG: ItemTableVariantConfig = {
     {
       id: 'exported',
       header: 'Exported',
-      className: 'text-muted text-sm',
+      className: 'text-muted-sm',
       render: item =>
         item.ebayExportedAt
           ? new Date(item.ebayExportedAt).toLocaleDateString()

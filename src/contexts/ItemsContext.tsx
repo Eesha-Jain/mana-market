@@ -9,13 +9,19 @@ import {
   useCallback,
   type ReactNode,
 } from 'react';
-import type { ItemListing, Product } from '../types';
+import type { ItemListing, Product, ItemSource } from '../types';
 import { generateListingId, ITEM_STATUS } from '../types';
 import { useAuth } from './AuthContext';
 import { useToast } from './ToastContext';
 import { useUserSettings } from './UserSettingsContext';
 import { resolveMarketPricePreference, type UserSettings } from '../utils/userSettings';
 import { isSupabaseConfigured, getAccessToken } from '@/lib/supabase/client';
+import {
+  formatPersistenceError,
+  readUserScopedJson,
+  userScopedStorageKey,
+  writeUserScopedJson,
+} from '@/lib/persistence/userScopedStorage';
 import {
   deleteAllListingsAction,
   deleteListingAction,
@@ -45,7 +51,7 @@ function reducer(items: ItemListing[], action: Action): ItemListing[] {
 interface ItemsContextType {
   items: ItemListing[];
   isLoading: boolean;
-  addItem: (query: string, source?: 'manual' | 'csv' | 'photo', overrides?: Partial<ItemListing>) => ItemListing;
+  addItem: (query: string, source?: ItemSource, overrides?: Partial<ItemListing>) => ItemListing;
   updateItem: (id: string, updates: Partial<ItemListing>) => void;
   removeItem: (id: string) => void;
   clearItems: () => void;
@@ -53,14 +59,7 @@ interface ItemsContextType {
 
 const ItemsContext = createContext<ItemsContextType | null>(null);
 
-function localStorageKey(userId: string) {
-  return `mtg_lister_items_${userId}`;
-}
-
-function formatSyncError(err: unknown, action: string): string {
-  const detail = err instanceof Error ? err.message : String(err);
-  return `Could not ${action}: ${detail}. Your local changes are kept but may not persist after refresh.`;
-}
+const itemsStorageKey = (userId: string) => userScopedStorageKey('items', userId);
 
 /** Migrate legacy items that used card / sealedProduct fields. */
 function migrateStoredItem(raw: Record<string, unknown>): ItemListing {
@@ -106,7 +105,7 @@ function ensureListingFields(item: ItemListing): ItemListing {
 function makeItem(
   settings: UserSettings,
   query: string,
-  source: 'manual' | 'csv' | 'photo',
+  source: ItemSource,
   overrides: Partial<ItemListing> = {},
 ): ItemListing {
   return {
@@ -161,16 +160,19 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
         })
         .then(loaded => dispatchItems({ type: 'SET_ITEMS', items: loaded.map(ensureListingFields) }))
         .catch(err => {
-          toast.error(formatSyncError(err, 'load your listings'));
+          toast.error(formatPersistenceError(
+            err,
+            'load your listings',
+            ' Your local changes are kept but may not persist after refresh.',
+          ));
         })
         .finally(() => setIsLoading(false));
       return;
     }
 
     try {
-      const raw = localStorage.getItem(localStorageKey(user.id));
-      if (raw) {
-        const parsed = JSON.parse(raw) as Record<string, unknown>[];
+      const parsed = readUserScopedJson<Record<string, unknown>[]>(itemsStorageKey(user.id), []);
+      if (parsed.length) {
         dispatchItems({
           type: 'SET_ITEMS',
           items: parsed.map(r => ensureListingFields(migrateStoredItem(r))),
@@ -195,12 +197,12 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!user || isSupabaseConfigured()) return;
-    localStorage.setItem(localStorageKey(user.id), JSON.stringify(items));
+    writeUserScopedJson(itemsStorageKey(user.id), items);
   }, [items, user?.id]);
 
   const addItem = (
     query: string,
-    source: 'manual' | 'csv' | 'photo' = 'manual',
+    source: ItemSource = 'manual',
     overrides: Partial<ItemListing> = {},
   ) => {
     const item = makeItem(settings, query, source, overrides);
@@ -209,7 +211,7 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
       void getAccessToken().then(token => {
         if (!token) return;
         void insertListingAction(token, item).catch(err => {
-          toast.error(formatSyncError(err, 'save listing'));
+          toast.error(formatPersistenceError(err, 'save listing', ' Your local changes are kept but may not persist after refresh.'));
         });
       });
     }
@@ -233,7 +235,7 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
         void getAccessToken().then(token => {
           if (!token) return;
           void updateListingAction(token, merged).catch(err => {
-            toast.error(formatSyncError(err, 'update listing'));
+            toast.error(formatPersistenceError(err, 'update listing', ' Your local changes are kept but may not persist after refresh.'));
           });
         });
       }, 400),
@@ -246,7 +248,7 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
       void getAccessToken().then(token => {
         if (!token) return;
         void deleteListingAction(token, id).catch(err => {
-          toast.error(formatSyncError(err, 'delete listing'));
+          toast.error(formatPersistenceError(err, 'delete listing', ' Your local changes are kept but may not persist after refresh.'));
         });
       });
     }
@@ -258,7 +260,7 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
       void getAccessToken().then(token => {
         if (!token) return;
         void deleteAllListingsAction(token).catch(err => {
-          toast.error(formatSyncError(err, 'clear listings'));
+          toast.error(formatPersistenceError(err, 'clear listings', ' Your local changes are kept but may not persist after refresh.'));
         });
       });
     }

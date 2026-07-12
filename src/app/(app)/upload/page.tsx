@@ -15,7 +15,7 @@ import {
   type ColumnMappingChoice,
 } from '@/utils/csvParser';
 import { getLookupFromRow, parseBulkLine } from '@/utils/productLookup';
-import type { CSVRow, EbayCondition } from '@/types';
+import type { CSVRow } from '@/types';
 import { PhotoScanTab } from '@/components/upload/PhotoScanTab';
 import { ProductReviewFlow } from '@/components/review/ProductReviewFlow';
 import { ItemsTable } from '@/components/listings/ItemsTable';
@@ -24,12 +24,8 @@ import { ManualEntryPanel } from '@/components/upload/ManualEntryPanel';
 import { CsvImportPanel, type CsvPreviewRow } from '@/components/upload/CsvImportPanel';
 import { UPLOAD_TABS, type UploadTabId } from '@/utils/uploadTabs';
 import { buildEntryDraft, type EntryReviewDraft } from '@/utils/entryReview';
-import {
-  buildEntryProductReviewData,
-  type ProductReviewConfirmPayload,
-  type ProductReviewData,
-} from '@/utils/productReview';
-import { countItemStatuses, statusFromProductMatch } from '@/utils/itemStatus';
+import { useEntryReviewQueue } from '@/hooks/useEntryReviewQueue';
+import { countItemStatuses } from '@/utils/itemStatus';
 
 function buildPreview(rows: CSVRow[]): CsvPreviewRow[] {
   return rows
@@ -68,6 +64,21 @@ export default function Page() {
   const toast = useToast();
   const router = useRouter();
 
+  const {
+    entryReviewActive,
+    entryReviewData,
+    entryLookupLoading,
+    entryBatchProgress,
+    currentDraft,
+    entryIndex,
+    startEntryReview,
+    handleConfirmEntry,
+    handleSkipEntry,
+    handleExitEntryToReview,
+    handleCancelEntryBatch,
+    handleApplyConditionToRemaining,
+  } = useEntryReviewQueue({ addItem });
+
   const [activeTab, setActiveTab] = useState<UploadTabId>('single');
   const [manualInput, setManualInput] = useState('');
   const [bulkText, setBulkText] = useState('');
@@ -80,123 +91,7 @@ export default function Page() {
   const [importSourceLabel, setImportSourceLabel] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [entryQueue, setEntryQueue] = useState<EntryReviewDraft[]>([]);
-  const [entryIndex, setEntryIndex] = useState(0);
-  const [entryReviewActive, setEntryReviewActive] = useState(false);
-  const [entryReviewData, setEntryReviewData] = useState<ProductReviewData | null>(null);
-  const [entryLookupLoading, setEntryLookupLoading] = useState(false);
-
-  const entryQueueRef = useRef(entryQueue);
-  const entryIndexRef = useRef(entryIndex);
-  const entryReviewActiveRef = useRef(entryReviewActive);
-  const batchConditionPrefillRef = useRef<EbayCondition | null>(null);
-  entryQueueRef.current = entryQueue;
-  entryIndexRef.current = entryIndex;
-  entryReviewActiveRef.current = entryReviewActive;
-
   const { pending, ambiguous, found, notFound } = countItemStatuses(items);
-
-  const finishEntryQueue = () => {
-    batchConditionPrefillRef.current = null;
-    setEntryQueue([]);
-    setEntryIndex(0);
-    setEntryReviewActive(false);
-    setEntryReviewData(null);
-    setEntryLookupLoading(false);
-  };
-
-  const processEntryDraftAt = async (index: number, drafts = entryQueueRef.current) => {
-    const draft = drafts[index];
-    if (!draft) {
-      finishEntryQueue();
-      return;
-    }
-
-    setEntryLookupLoading(true);
-    setEntryReviewData(null);
-    try {
-      const data = await buildEntryProductReviewData(draft);
-      const prefill = batchConditionPrefillRef.current;
-      if (!draft.condition && prefill) {
-        data.initialCondition = prefill;
-      }
-      setEntryReviewData(data);
-    } finally {
-      setEntryLookupLoading(false);
-    }
-  };
-
-  const startEntryReview = (drafts: EntryReviewDraft[]) => {
-    if (!drafts.length || entryReviewActiveRef.current) return;
-    batchConditionPrefillRef.current = null;
-    setEntryQueue(drafts);
-    setEntryIndex(0);
-    setEntryReviewActive(true);
-    void processEntryDraftAt(0, drafts);
-  };
-
-  const advanceEntryQueue = () => {
-    const nextIndex = entryIndexRef.current + 1;
-    if (nextIndex >= entryQueueRef.current.length) {
-      finishEntryQueue();
-      return;
-    }
-    setEntryIndex(nextIndex);
-    void processEntryDraftAt(nextIndex);
-  };
-
-  const queueEntry = (payload: ProductReviewConfirmPayload) => {
-    addItem(payload.query, payload.source, {
-      customTitle: payload.customTitle,
-      customDescription: payload.customDescription,
-      originalUpc: payload.originalUpc,
-      originalSku: payload.originalSku,
-      quantity: payload.quantity,
-      condition: payload.condition,
-      pricingMode: payload.pricingMode,
-      percentBelow: payload.percentBelow,
-      manualPrice: payload.manualPrice,
-      marketPricePreference: payload.marketPricePreference,
-      selectedMarketPriceSource: payload.selectedMarketPriceSource,
-      photoUrl: payload.photoUrl,
-      userImageUrl: payload.userImageUrl,
-      preferredImageSource: payload.preferredImageSource,
-      status: statusFromProductMatch(!!payload.product),
-      product: payload.product,
-      detectedProductType: payload.parseMeta?.packType,
-      detectedCardCount: payload.parseMeta?.cardCount,
-    });
-  };
-
-  const handleApplyConditionToRemaining = (condition: EbayCondition) => {
-    batchConditionPrefillRef.current = condition;
-    const currentIndex = entryIndexRef.current;
-    setEntryQueue(prev =>
-      prev.map((draft, index) =>
-        index > currentIndex && !draft.condition ? { ...draft, condition } : draft,
-      ),
-    );
-  };
-
-  const handleConfirmEntry = (payload: ProductReviewConfirmPayload) => {
-    queueEntry(payload);
-    setEntryReviewData(null);
-    advanceEntryQueue();
-  };
-
-  const handleSkipEntry = () => {
-    setEntryReviewData(null);
-    advanceEntryQueue();
-  };
-
-  const handleExitEntryToReview = () => {
-    finishEntryQueue();
-    router.push('/review');
-  };
-
-  const handleCancelEntryBatch = () => {
-    finishEntryQueue();
-  };
 
   const handleReviewSingle = () => {
     const query = manualInput.trim();
@@ -332,15 +227,6 @@ export default function Page() {
     setActiveTab(tab);
   };
 
-  const currentDraft = entryReviewActive ? entryQueue[entryIndex] : null;
-  const entryProgress = entryReviewActive && entryQueue.length > 1
-    ? {
-        current: entryIndex + 1,
-        total: entryQueue.length,
-        remaining: entryQueue.length - entryIndex - 1,
-      }
-    : undefined;
-
   const bulkLineCount = bulkText.trim().split(/\r?\n/).filter(Boolean).length;
 
   const tabPanels: Record<UploadTabId, ReactNode> = {
@@ -446,7 +332,7 @@ export default function Page() {
           onExitToReview={handleExitEntryToReview}
           onCancelBatch={handleCancelEntryBatch}
           queuedItemCount={items.length}
-          batchProgress={entryProgress}
+          batchProgress={entryBatchProgress}
           onApplyConditionToRemaining={handleApplyConditionToRemaining}
         />
       )}

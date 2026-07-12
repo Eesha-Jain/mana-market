@@ -8,6 +8,7 @@ import { useReviewDraft } from '@/hooks/useReviewDraft';
 import type { BatchProgress } from './ItemModalShell';
 import { ItemModalShell } from './ItemModalShell';
 import { PhotoLabelAssignmentPanel } from './PhotoLabelAssignmentPanel';
+import { BatchExitActions } from '@/components/review/BatchExitActions';
 
 export interface ItemModalReviewProps {
   mode: 'review';
@@ -86,7 +87,7 @@ export function ItemModalReview({
       titleRequired
       titleHint={
         draft.detectedTitle && draft.title !== draft.detectedTitle ? (
-          <span className="text-muted text-sm">Detected: {draft.detectedTitle}</span>
+          <span className="text-muted-sm">Detected: {draft.detectedTitle}</span>
         ) : undefined
       }
       onTitleFormatted={() => draft.setTitleEditedManually(true)}
@@ -131,11 +132,11 @@ export function ItemModalReview({
       onManualPriceChange={draft.setManualPrice}
       footerAfter={
         showExitToReview && !batchProgress ? (
-          <div className="photo-review-exit-bar">
-            <button type="button" className="btn-link btn-sm" onClick={onExitToReview}>
-              Review all {queuedItemCount} item{queuedItemCount !== 1 ? 's' : ''} →
-            </button>
-          </div>
+          <BatchExitActions
+            className="photo-review-exit-bar"
+            queuedItemCount={queuedItemCount}
+            onExitToReview={onExitToReview}
+          />
         ) : undefined
       }
       secondaryLabel={batchProgress ? (draft.isPhoto ? 'Skip photo' : 'Skip entry') : 'Cancel'}

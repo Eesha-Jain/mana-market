@@ -258,7 +258,7 @@ export function ItemModalShell({
             />
             Listed on eBay?
           </span>
-          <span className="text-muted text-sm">
+          <span className="text-muted-sm">
             {listedToggle.checked
               ? 'This listing is treated as live on eBay. Uncheck to edit details again.'
               : 'Check when the item is live on eBay (including if you listed it outside this app).'}

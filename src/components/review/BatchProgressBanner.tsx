@@ -1,5 +1,7 @@
 'use client';
 
+import { BatchExitActions } from './BatchExitActions';
+
 interface BatchProgress {
   current: number;
   total: number;
@@ -42,18 +44,12 @@ export function BatchProgressBanner({
       ) : (
         <span className="photo-batch-progress-remaining">Last {itemLabel.toLowerCase()}</span>
       )}
-      <div className="batch-exit-actions">
-        {queuedItemCount > 0 && onExitToReview && (
-          <button type="button" className="btn-link btn-sm" onClick={onExitToReview}>
-            Review all →
-          </button>
-        )}
-        {onCancelBatch && (
-          <button type="button" className="btn-link btn-sm batch-exit-cancel" onClick={onCancelBatch}>
-            Cancel upload
-          </button>
-        )}
-      </div>
+      <BatchExitActions
+        queuedItemCount={queuedItemCount}
+        onExitToReview={onExitToReview}
+        onCancel={onCancelBatch}
+        exitLabel="Review all →"
+      />
     </div>
   );
 }

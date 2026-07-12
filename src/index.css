@@ -64,6 +64,11 @@ code {
   font-size: 0.85rem;
 }
 
+.text-muted-sm {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;

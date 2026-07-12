@@ -1,5 +1,3 @@
-import { isPersistentImageUrl } from './utils/imageUrl';
-
 // eBay listing conditions (with their eBay condition IDs)
 export type EbayCondition =
   | 'New'
@@ -58,9 +56,38 @@ export interface PriceRange { low: number; high: number; }
 
 export type ImageCandidateSource = 'upc_catalog' | 'ebay_sold' | 'user_upload' | 'user_photo';
 
+/** Which hero image to show when both catalog and user uploads exist. */
+export type PreferredImageSource = 'catalog' | 'user';
+
+/** How the listing entered the app. */
+export type ItemSource = 'manual' | 'csv' | 'photo';
+
+export const EBAY_LISTING_STATUS = {
+  Exported: 'exported',
+  Active: 'active',
+  Sold: 'sold',
+  Ended: 'ended',
+} as const;
+
+export type EbayListingStatus = typeof EBAY_LISTING_STATUS[keyof typeof EBAY_LISTING_STATUS];
+
 export interface ImageCandidate {
   url: string;
   source: ImageCandidateSource;
+}
+
+/** Resolved pricing fields used by calculateDraftPrice. */
+export interface PricingCalculationInput {
+  pricingMode: PricingMode;
+  percentBelow: number;
+  manualPrice: number;
+}
+
+/** Partial pricing from import before user defaults are applied. */
+export interface DefaultPricingDraft {
+  manualPrice: number;
+  pricingMode?: PricingMode;
+  percentBelow?: number;
 }
 
 /** MTG product resolved via UPC lookup and/or eBay market data. */
@@ -118,7 +145,7 @@ export interface ItemListing {
   ebayExportedAt?: string;
   /** Marked live on eBay without exporting through this app. */
   listedExternally?: boolean;
-  ebayListingStatus?: 'exported' | 'active' | 'sold' | 'ended';
+  ebayListingStatus?: EbayListingStatus;
   /** Live eBay listing URL (paste after listing goes active). */
   ebayListingUrl?: string;
 
@@ -127,16 +154,50 @@ export interface ItemListing {
   /** User-uploaded image URL (Supabase Storage public URL). */
   userImageUrl?: string;
   /** Which image to show on listings and export. */
-  preferredImageSource?: 'catalog' | 'user';
+  preferredImageSource?: PreferredImageSource;
   /** Product format detected from label OCR (e.g. Foil Promo Pack, Commander Deck). */
   detectedProductType?: string;
   /** Card count detected from label OCR (e.g. "3 Cards"). */
   detectedCardCount?: string;
 
   // ── Meta ──
-  source: 'manual' | 'csv' | 'photo';
+  source: ItemSource;
   createdAt: string;
 }
+
+/** Initial listing fields shown in review dialogs before save. */
+export type ReviewListingDefaults = Pick<
+  ItemListing,
+  'quantity' | 'condition' | 'pricingMode' | 'percentBelow' | 'manualPrice'
+>;
+
+/** Fields collected when confirming a review flow — derived from ItemListing. */
+export type ListingCreatePayload = Pick<
+  ItemListing,
+  | 'query'
+  | 'source'
+  | 'customTitle'
+  | 'customDescription'
+  | 'originalUpc'
+  | 'originalSku'
+  | 'quantity'
+  | 'condition'
+  | 'pricingMode'
+  | 'percentBelow'
+  | 'manualPrice'
+  | 'marketPricePreference'
+  | 'selectedMarketPriceSource'
+  | 'product'
+  | 'photoUrl'
+  | 'userImageUrl'
+  | 'preferredImageSource'
+> & {
+  selectedImageUrl?: string;
+  parseMeta?: {
+    packType?: string;
+    cardCount?: string;
+  };
+};
 
 export interface CSVRow {
   name?: string;
@@ -166,79 +227,14 @@ export interface EbayListingPayload {
   sku?: string;
 }
 
-/** Generate a short, human-readable listing ID. */
-export function generateListingId(): string {
-  const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
-  let suffix = '';
-  for (let i = 0; i < 6; i++) {
-    suffix += chars[Math.floor(Math.random() * chars.length)]!;
-  }
-  return `MTG-${suffix}`;
-}
-
-/** Title detected from lookup (unchanged by user edits). */
-export function getDetectedTitle(item: ItemListing): string {
-  return item.product?.title ?? item.query;
-}
-
-/** Display / export title — uses customTitle when the user has overridden it. */
-export function getItemTitle(item: ItemListing): string {
-  const custom = item.customTitle?.trim();
-  if (custom) return custom;
-  return getDetectedTitle(item);
-}
-
-/** Whether the user has customized the listing title. */
-export function hasCustomTitle(item: ItemListing): boolean {
-  return !!item.customTitle?.trim();
-}
-
-/** Primary product image URL, if any (persistent HTTP/S only). */
-export function getItemImageUrl(item: ItemListing): string | null {
-  if (item.preferredImageSource === 'user') {
-    const userUrl = item.userImageUrl ?? item.photoUrl;
-    if (userUrl && isPersistentImageUrl(userUrl)) return userUrl;
-    return item.product?.imageUrls[0] ?? null;
-  }
-  if (item.product?.imageUrls[0]) return item.product.imageUrls[0];
-  const fallback = item.userImageUrl ?? item.photoUrl;
-  return fallback && isPersistentImageUrl(fallback) ? fallback : null;
-}
-
-/** All picture URLs for eBay export (selected image first, then catalog alternates). */
-export function getItemPictureUrls(item: ItemListing): string[] {
-  const seen = new Set<string>();
-  const urls: string[] = [];
-
-  const push = (url: string | null | undefined) => {
-    if (!url || !isPersistentImageUrl(url) || seen.has(url)) return;
-    seen.add(url);
-    urls.push(url);
-  };
-
-  push(getItemImageUrl(item));
-  if (item.preferredImageSource !== 'user') {
-    push(item.userImageUrl);
-  }
-  for (const url of item.product?.imageUrls ?? []) {
-    push(url);
-  }
-  push(item.photoUrl);
-
-  return urls.slice(0, 12);
-}
-
-export function itemHasListingImage(item: ItemListing): boolean {
-  return getItemPictureUrls(item).length > 0;
-}
-
-/** Listing description shown in the UI and eBay export. */
-export function getItemListingDescription(item: ItemListing): string {
-  return item.customDescription?.trim() ?? '';
-}
-
-/** Persist a user-edited listing description. */
-export function patchItemListingDescription(text: string): Pick<ItemListing, 'customDescription'> {
-  const trimmed = text.trim();
-  return { customDescription: trimmed || undefined };
-}
+export {
+  generateListingId,
+  getDetectedTitle,
+  getItemTitle,
+  hasCustomTitle,
+  getItemImageUrl,
+  getItemPictureUrls,
+  itemHasListingImage,
+  getItemListingDescription,
+  patchItemListingDescription,
+} from './utils/itemListing';
