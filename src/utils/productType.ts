@@ -1,7 +1,7 @@
 /** MTG sealed product types detectable from OCR or listing titles. */
 
 import type { ItemListing } from '../types';
-import { getItemTitle } from '../types';
+import { getItemTitle } from './items';
 
 const PRODUCT_TYPE_PATTERNS: { pattern: RegExp; label: string }[] = [
   { pattern: /collector\s*booster\s*display/i, label: 'Collector Booster Display' },
@@ -36,8 +36,7 @@ export function inferProductTypeFromText(text: string): string | null {
   return null;
 }
 
-/** Resolved product type for an item — OCR metadata first, then title inference. */
+/** Resolved product type for an item — inferred from title. */
 export function resolveItemProductType(item: ItemListing): string | null {
-  if (item.detectedProductType) return item.detectedProductType;
   return inferProductTypeFromText(getItemTitle(item));
 }

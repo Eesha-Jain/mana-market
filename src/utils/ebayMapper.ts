@@ -1,6 +1,12 @@
-import type { ItemListing, EbayListingPayload } from '../types';
-import { EBAY_CONDITIONS, getItemTitle, getItemListingDescription, getItemPictureUrls } from '../types';
-import { isItemFound } from './itemStatus';
+import type { UserItemWithCatalog, EbayListingPayload } from '../types';
+import { EBAY_CONDITIONS, LOOKUP_STATUS, WORKFLOW_STATUS } from '../types';
+import {
+  getItemTitle,
+  getItemListingDescription,
+  getItemPictureUrls,
+  getItemProduct,
+  isItemFound,
+} from './items';
 import { isItemListingLocked } from './listingLock';
 import { resolveItemMarketPrice } from './marketPrice';
 import { resolveItemProductType } from './productType';
@@ -15,28 +21,33 @@ function detectCategory(title: string): string {
     return MTG_BOOSTER_CATEGORY;
   }
   if (
-    t.includes('booster box') || t.includes('bundle') || t.includes('commander deck') ||
-    t.includes('prerelease') || t.includes('fat pack') || t.includes('gift box') ||
-    t.includes('starter kit') || t.includes('jumpstart')
+    t.includes('booster box') ||
+    t.includes('bundle') ||
+    t.includes('commander deck') ||
+    t.includes('prerelease') ||
+    t.includes('fat pack') ||
+    t.includes('gift box') ||
+    t.includes('starter kit') ||
+    t.includes('jumpstart')
   ) {
     return MTG_SEALED_CATEGORY;
   }
   return MTG_SEALED_CATEGORY;
 }
 
-export function getItemMarketPrice(item: ItemListing): number | null {
+export function getItemMarketPrice(item: UserItemWithCatalog): number | null {
   return resolveItemMarketPrice(item);
 }
 
-export function calculatePrice(item: ItemListing): number | null {
+export function calculatePrice(item: UserItemWithCatalog): number | null {
   return calculateDraftPrice(getItemMarketPrice(item), {
     pricingMode: item.pricingMode,
     percentBelow: item.percentBelow,
-    manualPrice: item.manualPrice,
+    manualPrice: item.price,
   });
 }
 
-function buildListingTitle(item: ItemListing): string {
+function buildListingTitle(item: UserItemWithCatalog): string {
   const title = getItemTitle(item);
   if (!item.condition) return title.slice(0, 80);
 
@@ -44,11 +55,10 @@ function buildListingTitle(item: ItemListing): string {
   return withCondition.length > 80 ? withCondition.slice(0, 77) + '...' : withCondition;
 }
 
-function buildDescription(item: ItemListing): string {
-  const p = item.product;
+function buildDescription(item: UserItemWithCatalog): string {
+  const p = getItemProduct(item);
   const displayTitle = getItemTitle(item);
-  const descriptionBody =
-    getItemListingDescription(item) || p?.description || '';
+  const descriptionBody = getItemListingDescription(item) || p?.description || '';
   if (!p) {
     const parts = [`<p>${displayTitle}</p>`];
     if (descriptionBody) parts.push(`<p>${descriptionBody.replace(/\n/g, '<br/>')}</p>`);
@@ -68,18 +78,22 @@ function buildDescription(item: ItemListing): string {
   return lines.filter(Boolean).join('\n');
 }
 
-function buildItemSpecifics(item: ItemListing): Record<string, string> {
-  const p = item.product;
+function buildItemSpecifics(item: UserItemWithCatalog): Record<string, string> {
+  const p = getItemProduct(item);
   if (!p) return {};
 
   const titleLower = p.title.toLowerCase();
   const productType =
     resolveItemProductType(item) ??
-    (titleLower.includes('booster pack') ? 'Booster Pack' :
-     titleLower.includes('booster box') ? 'Booster Box' :
-     titleLower.includes('commander') ? 'Commander Deck' :
-     titleLower.includes('bundle') ? 'Bundle' :
-     'Sealed Product');
+    (titleLower.includes('booster pack')
+      ? 'Booster Pack'
+      : titleLower.includes('booster box')
+        ? 'Booster Box'
+        : titleLower.includes('commander')
+          ? 'Commander Deck'
+          : titleLower.includes('bundle')
+            ? 'Bundle'
+            : 'Sealed Product');
 
   return {
     Game: 'Magic: The Gathering',
@@ -90,20 +104,20 @@ function buildItemSpecifics(item: ItemListing): Record<string, string> {
   };
 }
 
-export function isItemReady(item: ItemListing): boolean {
+export function isItemReady(item: UserItemWithCatalog): boolean {
   if (!isItemFound(item) || !item.condition || calculatePrice(item) === null) {
     return false;
   }
-  return !!item.product;
+  return !!getItemProduct(item);
 }
 
-export function isItemOnEbay(item: ItemListing): boolean {
-  return isItemListingLocked(item);
+export function isItemOnEbay(item: UserItemWithCatalog): boolean {
+  return !!item.marketplaceListings?.ebay || isItemListingLocked(item);
 }
 
-/** User-provided live listing URL, when set. */
-export function getEbayListingUrl(item: ItemListing): string | null {
-  const url = item.ebayListingUrl?.trim();
+/** Live eBay listing URL from marketplace export, when set. */
+export function getEbayListingUrl(item: UserItemWithCatalog): string | null {
+  const url = item.marketplaceListings?.ebay?.url?.trim();
   if (!url) return null;
   if (!/^https?:\/\//i.test(url)) return null;
   return url;
@@ -111,16 +125,15 @@ export function getEbayListingUrl(item: ItemListing): string | null {
 
 export const EBAY_SELLER_ACTIVE_LISTINGS_URL = 'https://www.ebay.com/sh/lst/active';
 
-export function buildEbayListing(item: ItemListing): EbayListingPayload | null {
-  if (!isItemFound(item) || !item.condition || !item.product) return null;
+export function buildEbayListing(item: UserItemWithCatalog): EbayListingPayload | null {
+  const product = getItemProduct(item);
+  if (!isItemFound(item) || !item.condition || !product) return null;
 
   const price = calculatePrice(item);
   if (price === null) return null;
 
   const conditionInfo = EBAY_CONDITIONS.find(c => c.label === item.condition) ?? null;
   if (!conditionInfo) return null;
-
-  const product = item.product;
 
   return {
     title: buildListingTitle(item),
@@ -134,15 +147,21 @@ export function buildEbayListing(item: ItemListing): EbayListingPayload | null {
     itemSpecifics: buildItemSpecifics(item),
     listingType: 'FixedPriceItem',
     listingDuration: 'GTC',
-    sku: item.listingId,
+    sku: item.referenceId,
   };
 }
 
-export function getExportableItems(items: ItemListing[]): ItemListing[] {
-  return items.filter(item => isItemReady(item) && !isItemOnEbay(item));
+export function getExportableItems(items: UserItemWithCatalog[]): UserItemWithCatalog[] {
+  return items.filter(
+    item =>
+      isItemReady(item) &&
+      !isItemOnEbay(item) &&
+      item.workflowStatus === WORKFLOW_STATUS.Ready &&
+      item.lookupStatus === LOOKUP_STATUS.Found,
+  );
 }
 
-export function exportListingsJSON(items: ItemListing[]): string {
+export function exportListingsJSON(items: UserItemWithCatalog[]): string {
   const payloads = items
     .filter(isItemReady)
     .filter(item => !isItemOnEbay(item))
