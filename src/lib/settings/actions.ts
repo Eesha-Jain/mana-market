@@ -1,6 +1,6 @@
 'use server';
 
-import type { UserSettings } from '@/utils/userSettings';
+import type { UserSettings } from '@/utils/settings';
 import { withAuthenticatedClient } from '@/lib/auth/server';
 import * as settingsDb from '@/lib/db/settings';
 

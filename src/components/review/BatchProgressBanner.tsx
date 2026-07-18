@@ -48,7 +48,8 @@ export function BatchProgressBanner({
         queuedItemCount={queuedItemCount}
         onExitToReview={onExitToReview}
         onCancel={onCancelBatch}
-        exitLabel="Review all →"
+        exitLabel="Finish later →"
+        cancelLabel="Save remaining & close"
       />
     </div>
   );

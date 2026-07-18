@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type {
   EbayCondition,
   MarketPricePreference,
-  MarketPriceSource,
   PricingMode,
   Product,
 } from '@/types';
@@ -15,13 +14,13 @@ import {
   collectReviewImageCandidates,
   type ProductReviewConfirmPayload,
   type ProductReviewData,
-} from '@/utils/productReview';
+} from '@/utils/review';
 import {
   composeFromAssignments,
   suggestInitialLineAssignments,
   type OcrLineAssignment,
   type OcrLineTarget,
-} from '@/utils/photoScanner';
+} from '@/utils/ocr';
 import { calculateDraftPrice } from '@/utils/pricing';
 import {
   resolveInitialSelectedSource,
@@ -31,7 +30,7 @@ import {
 import {
   resolveDefaultPricing,
   resolveMarketPricePreference,
-} from '@/utils/userSettings';
+} from '@/utils/settings';
 import type { TextCaseFormat } from '@/utils/textCase';
 import {
   applyReviewDefaultOffers,
@@ -41,7 +40,7 @@ import {
 interface UseReviewDraftOptions {
   data: ProductReviewData;
   matchedProduct: Product | null;
-  onConfirm: (payload: ProductReviewConfirmPayload) => void;
+  onConfirm: (payload: ProductReviewConfirmPayload, leaveAsDraft?: boolean) => void;
 }
 
 export function useReviewDraft({ data, matchedProduct, onConfirm }: UseReviewDraftOptions) {
@@ -98,7 +97,7 @@ export function useReviewDraft({ data, matchedProduct, onConfirm }: UseReviewDra
     resolvedMarketPricePreference,
   );
   const [selectedMarketPriceSource, setSelectedMarketPriceSource] = useState<
-    MarketPriceSource | undefined
+    string | undefined
   >(() => resolveInitialSelectedSource(activeProduct, resolvedMarketPricePreference));
   const [titleCaseUsed, setTitleCaseUsed] = useState<TextCaseFormat | null>(null);
   const [descriptionCaseUsed, setDescriptionCaseUsed] = useState<TextCaseFormat | null>(null);
@@ -107,6 +106,7 @@ export function useReviewDraft({ data, matchedProduct, onConfirm }: UseReviewDra
     ReturnType<typeof collectReviewDefaultOffers>
   >([]);
   const initialPricingRef = useRef(pricingDefaults);
+  const leaveAsDraftRef = useRef(false);
 
   const initialImageCandidates = useMemo(
     () => collectReviewImageCandidates(data, activeProduct),
@@ -118,7 +118,7 @@ export function useReviewDraft({ data, matchedProduct, onConfirm }: UseReviewDra
       : activeProduct?.imageUrls[0] ?? initialImageCandidates[0]?.url ?? null;
 
   const [imageSelection, setImageSelection] = useState<ProductImageSelection>(() => ({
-    selectedUrl: initialSelectedUrl,
+    selectedUrls: initialSelectedUrl ? [initialSelectedUrl] : [],
     userImageUrl: undefined,
     preferredImageSource:
       data.variant === 'photo' && data.photoUrl ? 'user' : 'catalog',
@@ -135,7 +135,7 @@ export function useReviewDraft({ data, matchedProduct, onConfirm }: UseReviewDra
     setManualPrice(pricingDefaults.manualPrice);
     initialPricingRef.current = pricingDefaults;
     setImageSelection({
-      selectedUrl: initialSelectedUrl,
+      selectedUrls: initialSelectedUrl ? [initialSelectedUrl] : [],
       userImageUrl: undefined,
       preferredImageSource:
         data.variant === 'photo' && data.photoUrl ? 'user' : 'catalog',
@@ -237,17 +237,18 @@ export function useReviewDraft({ data, matchedProduct, onConfirm }: UseReviewDra
     if (!trimmedTitle) return null;
 
     const trimmedDescription = description.trim();
-    const selectedImageUrl = imageSelection.selectedUrl;
-    const imageUrls = selectedImageUrl
+    const selectedImageUrls = imageSelection.selectedUrls;
+    const selectedImageUrl = selectedImageUrls[0] ?? null;
+    const imageUrls = selectedImageUrls.length
       ? [
-          selectedImageUrl,
-          ...(activeProduct?.imageUrls.filter(url => url !== selectedImageUrl) ?? []),
+          ...selectedImageUrls,
+          ...(activeProduct?.imageUrls.filter(url => !selectedImageUrls.includes(url)) ?? []),
         ]
       : activeProduct?.imageUrls ?? [];
 
     const priceSelection = activeProduct
       ? resolveProductMarketSelection(activeProduct, marketPricePreference, selectedMarketPriceSource)
-      : { price: null, source: null };
+      : { price: null, source: null, optionId: null };
 
     const product = activeProduct
       ? {
@@ -258,33 +259,36 @@ export function useReviewDraft({ data, matchedProduct, onConfirm }: UseReviewDra
           marketPrice: priceSelection.price ?? activeProduct.marketPrice,
           marketPriceSource: priceSelection.source ?? activeProduct.marketPriceSource,
         }
-      : trimmedDescription || selectedImageUrl
+      : trimmedDescription || selectedImageUrls.length
         ? {
             title: trimmedTitle,
             description: trimmedDescription,
-            imageUrls: selectedImageUrl ? [selectedImageUrl] : [],
+            imageUrls: selectedImageUrls,
           }
         : undefined;
 
     return {
       query: trimmedTitle,
       source: data.source,
-      customTitle: trimmedTitle,
-      customDescription: trimmedDescription || undefined,
-      originalUpc: data.originalUpc,
-      originalSku: data.originalSku,
+      customTitle: trimmedTitle || null,
+      customDescription: trimmedDescription || null,
+      originalUpc: data.originalUpc ?? null,
+      originalSku: data.originalSku ?? null,
       quantity,
       condition,
       pricingMode,
       percentBelow,
-      manualPrice,
-      marketPricePreference,
-      selectedMarketPriceSource: selectedMarketPriceSource ?? priceSelection.source ?? undefined,
+      price: manualPrice,
+      pricingSource: 'amazon',
+      selectedMarketPriceSource: selectedMarketPriceSource ?? priceSelection.optionId ?? null,
+      category: null,
+      notes: '',
       product,
-      photoUrl: data.photoUrl,
-      userImageUrl: imageSelection.userImageUrl,
+      photoUrl: data.photoUrl ?? null,
+      userImageUrl: imageSelection.userImageUrl ?? null,
       preferredImageSource: imageSelection.preferredImageSource,
       selectedImageUrl: selectedImageUrl ?? undefined,
+      selectedImageUrls,
       parseMeta: data.parseResult
         ? {
             packType: data.parseResult.packType ?? undefined,
@@ -294,9 +298,11 @@ export function useReviewDraft({ data, matchedProduct, onConfirm }: UseReviewDra
     };
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = (leaveAsDraft = false) => {
     const payload = buildConfirmPayload();
     if (!payload) return;
+
+    leaveAsDraftRef.current = leaveAsDraft;
 
     const offers = collectReviewDefaultOffers(
       settings,
@@ -315,13 +321,13 @@ export function useReviewDraft({ data, matchedProduct, onConfirm }: UseReviewDra
       return;
     }
 
-    onConfirm(payload);
+    onConfirm(payload, leaveAsDraft);
   };
 
   const finishConfirm = (payload: ProductReviewConfirmPayload) => {
     setPendingConfirmPayload(null);
     setPendingDefaultOffers([]);
-    onConfirm(payload);
+    onConfirm(payload, leaveAsDraftRef.current);
   };
 
   const handleSaveDefaultsConfirm = () => {
@@ -385,6 +391,7 @@ export function useReviewDraft({ data, matchedProduct, onConfirm }: UseReviewDra
     moveLine,
     resetLabelAssignments,
     handleConfirm,
+    handleConfirmAsDraft: () => handleConfirm(true),
     pendingDefaultOffers,
     handleSaveDefaultsConfirm,
     handleSaveDefaultsDecline,

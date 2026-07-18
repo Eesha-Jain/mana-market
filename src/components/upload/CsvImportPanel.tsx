@@ -5,7 +5,7 @@ import {
   getDuplicateMappingWarnings,
   type RawParsedTable,
   type ColumnMappingChoice,
-} from '@/utils/csvParser';
+} from '@/utils/csv';
 import { CsvColumnMapper } from './CsvColumnMapper';
 
 export interface CsvPreviewRow {
@@ -118,7 +118,7 @@ export function CsvImportPanel({
             </div>
           )}
 
-          <div className="csv-preview-table-wrapper">
+          <div className="items-table-wrapper">
             <table className="items-table">
               <thead>
                 <tr>

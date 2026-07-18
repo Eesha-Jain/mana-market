@@ -1,15 +1,9 @@
 'use client';
 
-import { getSupabase, getAccessToken, isSupabaseConfigured } from '@/lib/supabase/client';
+import type { Session, User as SupabaseUser } from '@supabase/supabase-js';
+import { getSupabase, getAccessToken } from '@/lib/supabase/client';
 import type { AppUser } from '@/lib/db/profiles';
 import { fetchProfileAction } from '@/lib/profiles/actions';
-import {
-  isLocalAuthMode,
-  loadLocalSession,
-  localLogin,
-  localLogout,
-  localRegister,
-} from '@/lib/localAuth';
 
 export type AuthUser = AppUser;
 
@@ -17,13 +11,9 @@ export type AuthResult = {
   success: boolean;
   error?: string;
   user?: AuthUser;
+  session?: Session | null;
+  needsEmailConfirmation?: boolean;
 };
-
-const SESSION_CHANGE_EVENT = 'mtg-auth-session-change';
-
-function notifySessionChange() {
-  window.dispatchEvent(new Event(SESSION_CHANGE_EVENT));
-}
 
 function fallbackUser(userId: string, email: string | undefined): AuthUser {
   return {
@@ -33,49 +23,83 @@ function fallbackUser(userId: string, email: string | undefined): AuthUser {
   };
 }
 
-export async function resolveAuthUser(userId: string, email: string | undefined): Promise<AuthUser> {
-  const token = await getAccessToken();
-  const profile = token ? await fetchProfileAction(token) : null;
-  if (profile) return profile;
-
-  const supabase = getSupabase();
-  const { data: { user } } = await supabase.auth.getUser();
-  const name =
-    user?.user_metadata?.name ??
-    email?.split('@')[0] ??
-    'User';
+export function userFromSupabase(authUser: SupabaseUser): AuthUser {
+  const email = authUser.email?.toLowerCase() ?? '';
+  const name = String(
+    authUser.user_metadata?.name ??
+    email.split('@')[0] ??
+    'User',
+  );
 
   return {
-    id: userId,
-    email: email?.toLowerCase() ?? '',
-    name: String(name),
+    id: authUser.id,
+    email,
+    name,
   };
+}
+
+export async function resolveAuthUser(userId: string, email: string | undefined): Promise<AuthUser> {
+  try {
+    const token = await getAccessToken();
+    if (token) {
+      const profile = await fetchProfileAction(token);
+      if (profile) return profile;
+    }
+  } catch (err) {
+    console.error('[auth] fetchProfile', err);
+  }
+
+  try {
+    const supabase = getSupabase();
+    const { data: { user } } = await supabase.auth.getUser();
+    const name =
+      user?.user_metadata?.name ??
+      email?.split('@')[0] ??
+      'User';
+
+    return {
+      id: userId,
+      email: email?.toLowerCase() ?? '',
+      name: String(name),
+    };
+  } catch {
+    return fallbackUser(userId, email);
+  }
 }
 
 export async function login(
   email: string,
   password: string,
 ): Promise<AuthResult> {
-  if (isLocalAuthMode()) {
-    const result = await localLogin(email, password);
-    if (result.success) notifySessionChange();
-    return { success: result.success, error: result.error, user: result.user };
+  try {
+    const supabase = getSupabase();
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
+
+    if (error) return { success: false, error: error.message };
+
+    if (!data.session) {
+      return {
+        success: false,
+        error: 'Sign in did not complete. Check your email confirmation or try again.',
+      };
+    }
+
+    if (data.user) {
+      return {
+        success: true,
+        user: userFromSupabase(data.user),
+        session: data.session,
+      };
+    }
+
+    return { success: false, error: 'Sign in failed — no user returned.' };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Sign in failed.';
+    return { success: false, error: message };
   }
-
-  const supabase = getSupabase();
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email: email.trim(),
-    password,
-  });
-
-  if (error) return { success: false, error: error.message };
-
-  if (data.user) {
-    const user = await resolveAuthUser(data.user.id, data.user.email);
-    return { success: true, user };
-  }
-
-  return { success: true };
 }
 
 export async function register(
@@ -83,45 +107,50 @@ export async function register(
   email: string,
   password: string,
 ): Promise<AuthResult> {
-  if (isLocalAuthMode()) {
-    const result = await localRegister(name, email, password);
-    if (result.success) notifySessionChange();
-    return { success: result.success, error: result.error, user: result.user };
+  try {
+    const supabase = getSupabase();
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
+      options: {
+        data: { name: name.trim() },
+      },
+    });
+
+    if (error) return { success: false, error: error.message };
+
+    if (data.user?.identities?.length === 0) {
+      return {
+        success: false,
+        error: 'An account with this email already exists. Sign in instead.',
+      };
+    }
+
+    if (!data.session) {
+      return {
+        success: false,
+        needsEmailConfirmation: true,
+        error:
+          'Account created. Check your email for a confirmation link, then sign in here.',
+      };
+    }
+
+    if (data.user) {
+      return {
+        success: true,
+        user: userFromSupabase(data.user),
+        session: data.session,
+      };
+    }
+
+    return { success: false, error: 'Registration failed — no user returned.' };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Registration failed.';
+    return { success: false, error: message };
   }
-
-  const supabase = getSupabase();
-  const { data, error } = await supabase.auth.signUp({
-    email: email.trim(),
-    password,
-    options: {
-      data: { name: name.trim() },
-    },
-  });
-
-  if (error) return { success: false, error: error.message };
-
-  if (!data.session) {
-    return {
-      success: false,
-      error: 'Check your email to confirm your account, then sign in.',
-    };
-  }
-
-  if (data.user) {
-    const user = await resolveAuthUser(data.user.id, data.user.email);
-    return { success: true, user };
-  }
-
-  return { success: true };
 }
 
 export function logout(): void {
-  if (isLocalAuthMode()) {
-    localLogout();
-    notifySessionChange();
-    return;
-  }
-
   void getSupabase().auth.signOut();
 }
 
@@ -130,15 +159,6 @@ export function subscribeToAuthUser(
   onUser: (user: AuthUser | null) => void,
   onReady?: () => void,
 ): () => void {
-  if (!isSupabaseConfigured()) {
-    onUser(loadLocalSession());
-    onReady?.();
-
-    const handler = () => onUser(loadLocalSession());
-    window.addEventListener(SESSION_CHANGE_EVENT, handler);
-    return () => window.removeEventListener(SESSION_CHANGE_EVENT, handler);
-  }
-
   const supabase = getSupabase();
   let active = true;
 
@@ -146,22 +166,26 @@ export function subscribeToAuthUser(
     if (active) onReady?.();
   };
 
-  const applySession = async (userId: string, email: string | undefined) => {
+  const applySessionUser = (authUser: SupabaseUser) => {
     if (!active) return;
-    try {
-      onUser(await resolveAuthUser(userId, email));
-    } catch (err) {
-      console.error('[auth] resolveAuthUser', err);
-      onUser(fallbackUser(userId, email));
-    }
+    const fast = userFromSupabase(authUser);
+    onUser(fast);
+    // Profile fetch must not block onAuthStateChange — signUp/signIn wait for this callback.
+    void resolveAuthUser(authUser.id, authUser.email)
+      .then(enriched => {
+        if (active) onUser(enriched);
+      })
+      .catch(err => {
+        console.error('[auth] resolveAuthUser', err);
+      });
   };
 
   supabase.auth.getSession()
-    .then(async ({ data: { session } }) => {
+    .then(({ data: { session } }) => {
       if (!active) return;
       finishReady();
       if (session?.user) {
-        await applySession(session.user.id, session.user.email);
+        applySessionUser(session.user);
       }
     })
     .catch(err => {
@@ -169,11 +193,11 @@ export function subscribeToAuthUser(
       finishReady();
     });
 
-  const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+  const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
     if (!active) return;
     finishReady();
     if (session?.user) {
-      await applySession(session.user.id, session.user.email);
+      applySessionUser(session.user);
     } else {
       onUser(null);
     }

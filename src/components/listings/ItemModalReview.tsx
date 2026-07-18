@@ -1,7 +1,7 @@
 'use client';
 
 import type { EbayCondition, Product } from '@/types';
-import type { ProductReviewConfirmPayload, ProductReviewData } from '@/utils/productReview';
+import type { ProductReviewConfirmPayload, ProductReviewData } from '@/utils/review';
 import { ProductMatchInsight } from '@/components/review/ProductMatchInsight';
 import { SaveDefaultPrompt } from '@/components/ui/SaveDefaultPrompt';
 import { useReviewDraft } from '@/hooks/useReviewDraft';
@@ -9,6 +9,12 @@ import type { BatchProgress } from './ItemModalShell';
 import { ItemModalShell } from './ItemModalShell';
 import { PhotoLabelAssignmentPanel } from './PhotoLabelAssignmentPanel';
 import { BatchExitActions } from '@/components/review/BatchExitActions';
+import {
+  getMarketPriceOptionId,
+  getMarketPriceOptions,
+  optionDisplayLabel,
+  resolveProductMarketSelection,
+} from '@/utils/marketPrice';
 
 export interface ItemModalReviewProps {
   mode: 'review';
@@ -16,8 +22,10 @@ export interface ItemModalReviewProps {
   matchedProduct: Product | null;
   allAmbiguousResults?: Product[] | null;
   onRequestDisambiguation?: () => void;
-  onConfirm: (payload: ProductReviewConfirmPayload) => void;
+  onConfirm: (payload: ProductReviewConfirmPayload, leaveAsDraft?: boolean) => void;
   onClose: () => void;
+  /** When set (bulk), secondary Skip uses this instead of onClose. */
+  onSkip?: () => void;
   onExitToReview?: () => void;
   queuedItemCount?: number;
   batchProgress?: BatchProgress;
@@ -31,12 +39,26 @@ export function ItemModalReview({
   onRequestDisambiguation,
   onConfirm,
   onClose,
+  onSkip,
   onExitToReview,
   queuedItemCount = 0,
   batchProgress,
   onApplyConditionToRemaining,
 }: Omit<ItemModalReviewProps, 'mode'>) {
   const draft = useReviewDraft({ data, matchedProduct, onConfirm });
+
+  const marketSelection = draft.activeProduct
+    ? resolveProductMarketSelection(
+        draft.activeProduct,
+        draft.marketPricePreference,
+        draft.selectedMarketPriceSource,
+      )
+    : null;
+  const activeMarketOption = draft.activeProduct && marketSelection?.optionId
+    ? getMarketPriceOptions(draft.activeProduct).find(
+        o => getMarketPriceOptionId(o) === marketSelection.optionId,
+      )
+    : null;
 
   const modalTitle = draft.isPhoto ? 'Review photo scan' : 'Review entry';
   const modalSubtitle = batchProgress
@@ -59,7 +81,7 @@ export function ItemModalReview({
       batchLabel={draft.isPhoto ? 'Photo' : 'Entry'}
       onClose={onClose}
       imageMissingBanner={
-        (data.missingImage || !draft.imageSelection.selectedUrl) && !data.scanError ? (
+        (data.missingImage || draft.imageSelection.selectedUrls.length === 0) && !data.scanError ? (
           <div className="product-image-missing-banner">
             No image found online — upload your own or pick from matches below.
           </div>
@@ -109,6 +131,10 @@ export function ItemModalReview({
         draft.activeProduct ? (
           <ProductMatchInsight
             product={draft.activeProduct}
+            marketPrice={draft.market}
+            marketSourceLabel={
+              activeMarketOption ? optionDisplayLabel(activeMarketOption) : undefined
+            }
             onPickDifferent={
               allAmbiguousResults && onRequestDisambiguation
                 ? onRequestDisambiguation
@@ -139,16 +165,31 @@ export function ItemModalReview({
           />
         ) : undefined
       }
+      footerBefore={
+        <button
+          type="button"
+          className="btn-link"
+          onClick={() => draft.handleConfirmAsDraft()}
+        >
+          Continue but leave as draft
+        </button>
+      }
       secondaryLabel={batchProgress ? (draft.isPhoto ? 'Skip photo' : 'Skip entry') : 'Cancel'}
-      onSecondary={onClose}
+      onSecondary={onSkip ?? onClose}
       primaryLabel={
         batchProgress
           ? batchProgress.current < batchProgress.total
-            ? 'Done → next'
-            : 'Done'
-          : 'Add to queue'
+            ? draft.yourPrice && draft.yourPrice > 0
+              ? 'Mark reviewed → next'
+              : 'Save draft → next'
+            : draft.yourPrice && draft.yourPrice > 0
+              ? 'Mark reviewed'
+              : 'Save as draft'
+          : draft.yourPrice && draft.yourPrice > 0
+            ? 'Mark as reviewed'
+            : 'Save as draft'
       }
-      onPrimary={draft.handleConfirm}
+      onPrimary={() => draft.handleConfirm(false)}
       afterModal={
         draft.pendingDefaultOffers.length > 0 ? (
           <SaveDefaultPrompt

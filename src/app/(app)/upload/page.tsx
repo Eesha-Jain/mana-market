@@ -4,31 +4,31 @@ import './page.css';
 
 import { useState, useRef, type DragEvent, type ChangeEvent, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { useItems } from '@/contexts/ItemsContext';
+import { useInventory } from '@/contexts/InventoryContext';
 import { useToast } from '@/contexts/ToastContext';
 import {
   parseTableRaw,
   applyColumnMappings,
   parseCSVFileRaw,
   defaultColumnMappings,
+  isHeaderLikeCsvRow,
   type RawParsedTable,
   type ColumnMappingChoice,
-} from '@/utils/csvParser';
-import { getLookupFromRow, parseBulkLine } from '@/utils/productLookup';
+} from '@/utils/csv';
+import { getLookupFromRow, parseBulkLine } from '@/utils/search';
 import type { CSVRow } from '@/types';
 import { PhotoScanTab } from '@/components/upload/PhotoScanTab';
 import { ProductReviewFlow } from '@/components/review/ProductReviewFlow';
-import { ItemsTable } from '@/components/listings/ItemsTable';
 import { TabBar } from '@/components/ui/TabBar';
 import { ManualEntryPanel } from '@/components/upload/ManualEntryPanel';
 import { CsvImportPanel, type CsvPreviewRow } from '@/components/upload/CsvImportPanel';
-import { UPLOAD_TABS, type UploadTabId } from '@/utils/uploadTabs';
-import { buildEntryDraft, type EntryReviewDraft } from '@/utils/entryReview';
+import { UPLOAD_TABS, type UploadTabId } from '@/utils/review';
+import { buildEntryDraft, type EntryReviewDraft } from '@/utils/review';
 import { useEntryReviewQueue } from '@/hooks/useEntryReviewQueue';
-import { countItemStatuses } from '@/utils/itemStatus';
 
 function buildPreview(rows: CSVRow[]): CsvPreviewRow[] {
   return rows
+    .filter(r => !isHeaderLikeCsvRow(r))
     .map(r => {
       const { query, originalUpc, originalSku } = getLookupFromRow(r);
       const name = (r.name || '').trim();
@@ -60,7 +60,7 @@ function previewRowToDraft(row: CsvPreviewRow): EntryReviewDraft {
 }
 
 export default function Page() {
-  const { items, addItem, removeItem } = useItems();
+  const { addItem, applyReviewToItem, removeItem } = useInventory();
   const toast = useToast();
   const router = useRouter();
 
@@ -68,16 +68,19 @@ export default function Page() {
     entryReviewActive,
     entryReviewData,
     entryLookupLoading,
+    entrySavingRemaining,
+    entryBootstrapping,
+    entryBatchLabel,
     entryBatchProgress,
+    remainingCount,
     currentDraft,
     entryIndex,
     startEntryReview,
     handleConfirmEntry,
     handleSkipEntry,
-    handleExitEntryToReview,
-    handleCancelEntryBatch,
-    handleApplyConditionToRemaining,
-  } = useEntryReviewQueue({ addItem });
+    handleExitSaveRemaining,
+    handleCancelQueue,
+  } = useEntryReviewQueue({ addItem, applyReviewToItem, removeItem });
 
   const [activeTab, setActiveTab] = useState<UploadTabId>('single');
   const [manualInput, setManualInput] = useState('');
@@ -90,8 +93,6 @@ export default function Page() {
   const [columnMappings, setColumnMappings] = useState<Record<string, ColumnMappingChoice>>({});
   const [importSourceLabel, setImportSourceLabel] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const { pending, ambiguous, found, notFound } = countItemStatuses(items);
 
   const handleReviewSingle = () => {
     const query = manualInput.trim();
@@ -211,8 +212,26 @@ export default function Page() {
     startEntryReview(csvPreview.map(previewRowToDraft));
     setCsvPreview([]);
     setPasteText('');
-    toast.success('Items added to your review queue.');
+    toast.success('Creating drafts and opening review…');
   };
+
+  const handleExitBatch = async () => {
+    try {
+      const saved = await handleExitSaveRemaining();
+      if (saved > 0) {
+        toast.success(
+          saved === 1
+            ? 'Saved 1 remaining item as Draft — continue in Manage.'
+            : `Saved ${saved} remaining items as Draft — continue in Manage.`,
+        );
+        router.push('/manage');
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to save remaining items');
+    }
+  };
+
+  const isBulkReview = Boolean(entryBatchProgress);
 
   const clearPreview = () => {
     setCsvPreview([]);
@@ -280,38 +299,16 @@ export default function Page() {
         <div>
           <h1 className="page-title">Upload Items</h1>
           <p className="page-subtitle">
-            Add Magic: The Gathering products by name, SKU, UPC, or paste from a spreadsheet.
-            UPC is looked up first when provided. Product name and SKU both help find items on eBay;
-            when one returns multiple matches, the other is used to narrow results.
+            Add products by name, SKU, or UPC — paste from a spreadsheet, upload in bulk, or scan with your camera.
+            Items land in Manage as drafts; confirming a price in review marks them reviewed.
           </p>
         </div>
-        {items.length > 0 && (
-          <button className="btn-primary" onClick={() => router.push('/review')}>
-            Review {items.length} item{items.length !== 1 ? 's' : ''} →
-          </button>
-        )}
+        <button type="button" className="btn-secondary" onClick={() => router.push('/manage')}>
+          Go to Manage →
+        </button>
       </div>
 
-      {items.length > 0 && (
-        <div className="progress-section">
-          <div className="progress-stats">
-            {pending   > 0 && <span className="badge badge--blue badge--pulse">{pending} searching</span>}
-            {found     > 0 && <span className="badge badge--green">{found} found</span>}
-            {ambiguous > 0 && <span className="badge badge--yellow">{ambiguous} needs selection</span>}
-            {notFound  > 0 && <span className="badge badge--red">{notFound} not found</span>}
-          </div>
-          {pending > 0 && (
-            <div className="progress-bar-track">
-              <div
-                className="progress-bar-fill"
-                style={{ width: `${((found + ambiguous + notFound) / items.length) * 100}%` }}
-              />
-            </div>
-          )}
-        </div>
-      )}
-
-      <div className="upload-card">
+      <div className="upload-card organic-panel">
         <TabBar
           tabs={UPLOAD_TABS}
           active={activeTab}
@@ -321,35 +318,33 @@ export default function Page() {
         {tabPanels[activeTab]}
       </div>
 
-      {entryReviewActive && (
+      {(entryReviewActive || entrySavingRemaining) && (
         <ProductReviewFlow
           key={`entry-${entryIndex}-${currentDraft?.query ?? ''}-${currentDraft?.originalUpc ?? ''}-${currentDraft?.originalSku ?? ''}`}
-          data={entryReviewData}
-          loading={entryLookupLoading}
-          loadingMessage={`Looking up ${currentDraft?.query ?? 'product'}…`}
+          data={entrySavingRemaining || entryBootstrapping ? null : entryReviewData}
+          loading={entryLookupLoading || entrySavingRemaining || entryBootstrapping}
+          loadingMessage={
+            entryBootstrapping
+              ? 'Creating draft items…'
+              : entrySavingRemaining
+                ? `Saving ${remainingCount} remaining item${remainingCount !== 1 ? 's' : ''} to Drafts…`
+                : `Looking up ${currentDraft?.query ?? 'product'}…`
+          }
           onConfirm={handleConfirmEntry}
-          onClose={handleSkipEntry}
-          onExitToReview={handleExitEntryToReview}
-          onCancelBatch={handleCancelEntryBatch}
-          queuedItemCount={items.length}
+          onClose={
+            entrySavingRemaining || entryBootstrapping
+              ? () => undefined
+              : isBulkReview
+                ? handleExitBatch
+                : handleCancelQueue
+          }
+          onSkip={isBulkReview && !entrySavingRemaining && !entryBootstrapping ? handleSkipEntry : undefined}
+          onCancelBatch={isBulkReview && !entrySavingRemaining && !entryBootstrapping ? handleExitBatch : undefined}
+          onExitToReview={isBulkReview && !entrySavingRemaining && !entryBootstrapping ? handleExitBatch : undefined}
+          queuedItemCount={isBulkReview ? remainingCount : 0}
           batchProgress={entryBatchProgress}
-          onApplyConditionToRemaining={handleApplyConditionToRemaining}
+          batchLabel={entryBatchLabel}
         />
-      )}
-
-      {items.length > 0 && (
-        <div className="upload-queue">
-          <div className="section-header">
-            <h2 className="section-title">Current Queue ({items.length})</h2>
-            <button className="btn-primary btn-sm" onClick={() => router.push('/review')}>
-              Review All →
-            </button>
-          </div>
-          <ItemsTable
-            items={[...items].reverse()}
-            onRemove={removeItem}
-          />
-        </div>
       )}
     </div>
   );

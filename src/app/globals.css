@@ -1,58 +1,89 @@
 @import '../index.css';
 
 :root {
-    /* Backgrounds & surfaces (Mana Market: deep black) */
-    --bg: #0a0a0a;
-    --surface: #121212;
-    --surface-2: #1a1a1a;
-    --surface-3: #242424;
+    /* Organic dark — deep forest floor, not flat black */
+    --bg: #090b0a;
+    --bg-elevated: #0e1110;
+    --surface: #121614;
+    --surface-2: #181c19;
+    --surface-3: #1f2421;
 
-    /* Borders */
-    --border: #2e2e2e;
-    --border-sub: #1a1a1a;
+    /* Borders — soft, low contrast */
+    --border: rgba(255, 255, 255, 0.08);
+    --border-sub: rgba(255, 255, 255, 0.04);
+    --border-focus: rgba(122, 158, 135, 0.45);
 
-    /* Brand / accent (metallic gold from logo) */
-    --gold: #c9a227;
-    --gold-hover: #dbb84a;
-    --gold-dim: #a88620;
-    --gold-subtle: rgba(201, 162, 39, 0.04);
-    --gold-soft: rgba(201, 162, 39, 0.08);
-    --gold-medium: rgba(201, 162, 39, 0.1);
-    --gold-strong: rgba(201, 162, 39, 0.12);
-    --on-accent: #0a0a0a;
+    /* Brand — warm moss + amber (organic, not neon) */
+    --accent: #7a9e87;
+    --accent-hover: #8fb39c;
+    --accent-dim: #5a7a64;
+    --accent-subtle: rgba(122, 158, 135, 0.1);
+    --accent-glow: rgba(122, 158, 135, 0.18);
 
-    /* Text */
-    --text: #f0ebe3;
-    --text-muted: #9a9288;
-    --text-faint: #6e6860;
+    --gold: #c4a574;
+    --gold-hover: #d4b88a;
+    --gold-dim: #8a7350;
+    --gold-subtle: rgba(196, 165, 116, 0.06);
+    --gold-soft: rgba(196, 165, 116, 0.1);
+    --gold-medium: rgba(196, 165, 116, 0.12);
+    --gold-strong: rgba(196, 165, 116, 0.16);
+    --on-accent: #090b0a;
 
-    /* Semantic colors */
-    --green: #3fb950;
-    --green-dim: #1b4721;
-    --yellow: #d29922;
-    --yellow-dim: #4a3000;
-    --red: #f85149;
-    --red-dim: #4a1a1a;
-    --red-hover: #d73a31;
-    --blue: #58a6ff;
-    --blue-dim: #1a2f4a;
+    /* CTA — high contrast, one obvious action (Vercel-style clarity) */
+    --cta: #f2f4f1;
+    --cta-hover: #ffffff;
+    --on-cta: #090b0a;
+
+    /* Text — warm neutrals */
+    --text: #eceee9;
+    --text-muted: #9aa39a;
+    --text-faint: #6b736c;
+
+    /* Semantic */
+    --green: #6eb87a;
+    --green-dim: rgba(110, 184, 122, 0.12);
+    --yellow: #c9a84c;
+    --yellow-dim: rgba(201, 168, 76, 0.12);
+    --red: #e0706a;
+    --red-dim: rgba(224, 112, 106, 0.12);
+    --red-hover: #c95a54;
+    --blue: #6ba3d4;
+    --blue-dim: rgba(107, 163, 212, 0.12);
     --on-light: #fff;
 
-    /* Border radius */
-    --radius-xs: 3px;
-    --radius: 6px;
-    --radius-md: 9px;
-    --radius-lg: 10px;
-    --radius-full: 50%;
+    /* Radius — soft, organic */
+    --radius-xs: 6px;
+    --radius: 10px;
+    --radius-md: 14px;
+    --radius-lg: 18px;
+    --radius-xl: 24px;
+    --radius-full: 9999px;
+
+    /* Surfaces */
+    --gradient-warm: radial-gradient(ellipse 80% 50% at 50% -20%, var(--accent-glow), transparent 70%);
+    --gradient-surface: linear-gradient(180deg, var(--surface-2) 0%, var(--surface) 100%);
+    --gradient-mesh:
+        radial-gradient(ellipse 60% 40% at 20% 0%, rgba(122, 158, 135, 0.07), transparent 50%),
+        radial-gradient(ellipse 50% 35% at 80% 10%, rgba(196, 165, 116, 0.05), transparent 45%),
+        var(--bg);
 
     /* Shadows */
-    --shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
-    --shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.4);
+    --shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.35);
 
     /* Typography */
-    --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    --font: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
     --font-mono: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
 
     /* Layout */
-    --content-max-width: 1200px;
+    --content-max-width: 1120px;
+    --nav-height: 52px;
+}
+
+/* Shared surface card */
+.organic-panel {
+    background: var(--gradient-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
 }

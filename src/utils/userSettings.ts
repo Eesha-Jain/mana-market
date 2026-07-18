@@ -39,7 +39,7 @@ export const USER_SETTINGS_FALLBACKS = {
   descriptionCase: 'as_detected' as TextCaseFormat,
   pricingMode: 'market' as PricingMode,
   percentBelow: 10,
-  marketPricePreference: 'ebay' as MarketPricePreference,
+  marketPricePreference: 'amazon' as MarketPricePreference,
 };
 
 export const MARKET_PRICE_PREFERENCE_OPTIONS: {
@@ -48,19 +48,21 @@ export const MARKET_PRICE_PREFERENCE_OPTIONS: {
   description: string;
 }[] = [
   {
-    value: 'ebay',
-    label: 'eBay sold listings',
-    description: 'Use the average from recent eBay sold listings.',
+    value: 'amazon',
+    label: 'Amazon (default)',
+    description: 'Always use the Amazon retail / Buy Box price as market reference when available.',
   },
   {
     value: 'upc',
-    label: 'UPC catalog',
-    description: 'Use merchant offers or recorded catalog price from the UPC database.',
+    label: 'First UPC store offer',
+    description:
+      'Use the freshest shopping-info price from UPC Item DB (eBay, Walmart, etc.) as the default market price.',
   },
   {
     value: 'show_all',
     label: 'Show all (pick per item)',
-    description: 'Show every available price and choose which one to use on each listing.',
+    description:
+      'Show Amazon plus every UPC store offer and choose which one to use on each listing — including for % below market.',
   },
 ];
 
@@ -105,7 +107,8 @@ export function normalizePricingMode(value: unknown): PricingMode | null {
 }
 
 export function normalizeMarketPricePreference(value: unknown): MarketPricePreference | null {
-  if (value === 'ebay' || value === 'upc' || value === 'show_all') return value;
+  if (value === 'amazon' || value === 'upc' || value === 'show_all') return value;
+  if (value === 'ebay') return 'amazon';
   return null;
 }
 

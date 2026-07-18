@@ -3,7 +3,7 @@
 import {
   PHOTO_CAPTURE_TARGET_OPTIONS,
   type PhotoCaptureTarget,
-} from '@/utils/userSettings';
+} from '@/utils/settings';
 
 interface PhotoCaptureTargetSelectorProps {
   value: PhotoCaptureTarget | null;

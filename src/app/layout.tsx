@@ -1,14 +1,13 @@
 import type { Metadata } from 'next';
 import { AuthProvider } from '@/contexts/AuthContext';
-import { ItemsProvider } from '@/contexts/ItemsContext';
+import { InventoryProvider } from '@/contexts/InventoryContext';
 import { ToastProvider } from '@/contexts/ToastContext';
 import { UserSettingsProvider } from '@/contexts/UserSettingsContext';
 import './globals.css';
 
 export const metadata: Metadata = {
   title: 'Mana Market',
-  description:
-    'Mana Market — list Magic The Gathering sealed products on eBay with UPC lookup, OCR photo scan, and pricing tools.',
+  description: 'Upload inventory, price from catalog data, and list across marketplaces.',
   icons: {
     icon: '/logo.png',
   },
@@ -16,12 +15,12 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body>
+    <html lang="en" suppressHydrationWarning>
+      <body suppressHydrationWarning>
         <ToastProvider>
           <AuthProvider>
             <UserSettingsProvider>
-              <ItemsProvider>{children}</ItemsProvider>
+              <InventoryProvider>{children}</InventoryProvider>
             </UserSettingsProvider>
           </AuthProvider>
         </ToastProvider>

@@ -1,21 +1,22 @@
 'use client';
 
 import { useState } from 'react';
-import type { ItemListing } from '@/types';
+import type { UserItemWithCatalog } from '@/types';
 import { Modal } from '@/components/ui/Modal';
-import { CSV_COLUMNS, buildCsvContent, downloadCsv } from '@/utils/csvExporter';
-import { isItemFoundWithProduct } from '@/utils/itemStatus';
+import { CSV_COLUMNS, buildCsvContent, downloadCsv } from '@/utils/csv';
+import { isItemFoundWithCatalog } from '@/utils/items';
 
 interface CsvExportModalProps {
-  items: ItemListing[];
+  items: UserItemWithCatalog[];
   onClose: () => void;
+  onExported?: (items: UserItemWithCatalog[]) => void;
 }
 
 const DEFAULT_COLUMNS = [
-  'listing_id', 'name', 'brand', 'upc', 'sku', 'condition', 'quantity', 'list_price', 'image_url', 'notes',
+  'reference_id', 'name', 'brand', 'upc', 'sku', 'category', 'condition', 'quantity', 'list_price', 'image_url', 'notes',
 ];
 
-export function CsvExportModal({ items, onClose }: CsvExportModalProps) {
+export function CsvExportModal({ items, onClose, onExported }: CsvExportModalProps) {
   const [selectedIds, setSelectedIds] = useState<string[]>(DEFAULT_COLUMNS);
   const [headers, setHeaders] = useState<Record<string, string>>(() => {
     const h: Record<string, string> = {};
@@ -23,7 +24,7 @@ export function CsvExportModal({ items, onClose }: CsvExportModalProps) {
     return h;
   });
 
-  const exportable = items.filter(isItemFoundWithProduct);
+  const exportable = items.filter(isItemFoundWithCatalog);
 
   const toggleColumn = (id: string) => {
     setSelectedIds(prev =>
@@ -48,6 +49,7 @@ export function CsvExportModal({ items, onClose }: CsvExportModalProps) {
     const content = buildCsvContent(exportable, { columnIds: selectedIds, headers });
     const date = new Date().toISOString().slice(0, 10);
     downloadCsv(content, `mtg_inventory_${date}.csv`);
+    onExported?.(exportable);
     onClose();
   };
 

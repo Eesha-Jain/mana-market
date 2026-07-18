@@ -1,8 +1,8 @@
 import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { UserSettings } from '@/utils/userSettings';
-import { loadUserSettings } from '@/utils/userSettings';
+import type { UserSettings } from '@/utils/settings';
+import { loadUserSettings } from '@/utils/settings';
 
 function assertNoError(error: { message?: string } | null, operation: string): void {
   if (error) {
