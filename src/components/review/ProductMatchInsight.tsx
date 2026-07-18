@@ -7,20 +7,28 @@ import {
   getMarketPriceSourceLabel,
   getProductMarketPrice,
 } from '@/utils/productApi';
+import { getAmazonProductUrl, getUpcCatalogUrl } from '@/utils/marketPrice';
 import { ProductExternalLinks } from './ProductExternalLinks';
 
 interface ProductMatchInsightProps {
   product: Product;
+  /** When set, overrides the static product.marketPrice (updates with source picker). */
+  marketPrice?: number | null;
+  /** Display label for the active market source. */
+  marketSourceLabel?: string;
   onPickDifferent?: () => void;
 }
 
 export function ProductMatchInsight({
   product,
+  marketPrice,
+  marketSourceLabel,
   onPickDifferent,
 }: ProductMatchInsightProps) {
-  const market = getProductMarketPrice(product);
+  const market = marketPrice !== undefined ? marketPrice : getProductMarketPrice(product);
   const priceRange = formatPriceRange(product.priceRange);
-  const sourceLabel = getMarketPriceSourceLabel(product.marketPriceSource);
+  const sourceLabel =
+    marketSourceLabel ?? getMarketPriceSourceLabel(product.marketPriceSource);
 
   return (
     <div className="product-match-panel">
@@ -88,6 +96,8 @@ export function ProductMatchInsight({
       </div>
 
       <ProductExternalLinks
+        amazonUrl={getAmazonProductUrl(product)}
+        upcUrl={getUpcCatalogUrl(product)}
         ebaySearchUrl={product.ebaySearchUrl}
         tcgplayerUrl={product.tcgplayerUrl}
       />

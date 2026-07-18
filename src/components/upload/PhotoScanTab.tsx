@@ -1,24 +1,20 @@
 'use client';
 
 import { useState, useRef, type ChangeEvent } from 'react';
-import { useRouter } from 'next/navigation';
-import { useItems } from '@/contexts/ItemsContext';
+import { useInventory } from '@/contexts/InventoryContext';
 import { useToast } from '@/contexts/ToastContext';
 import { useUserSettings } from '@/contexts/UserSettingsContext';
-import { buildPhotoReviewData } from '@/utils/photoReview';
-import { persistPhotoScanImage } from '@/utils/imageUpload';
+import { buildPhotoReviewData } from '@/utils/review';
+import { persistPhotoScanImage } from '@/utils/images';
 import { ProductReviewFlow } from '@/components/review/ProductReviewFlow';
 import { PhotoCaptureTargetSelector } from './PhotoCaptureTargetSelector';
 import { PhotoCaptureActions } from './PhotoCaptureActions';
-import { SaveDefaultPrompt, type DefaultSaveOffer } from '@/components/ui/SaveDefaultPrompt';
-import type { ProductReviewConfirmPayload, ProductReviewData } from '@/utils/productReview';
-import type { EbayCondition } from '@/types';
-import { statusFromProductMatch } from '@/utils/itemStatus';
+import type { ProductReviewConfirmPayload, ProductReviewData } from '@/utils/review';
+import { lookupStatusFromMatch } from '@/utils/items';
 import {
   describePhotoCaptureTarget,
-  settingLabel,
   type PhotoCaptureTarget,
-} from '@/utils/userSettings';
+} from '@/utils/settings';
 
 interface PendingPhoto {
   id: string;
@@ -67,14 +63,13 @@ function revokePendingPhotos(photos: PendingPhoto[]) {
 }
 
 export function PhotoScanTab() {
-  const { addItem, items } = useItems();
+  const { addItem } = useInventory();
   const toast = useToast();
   const {
     photoCaptureTarget,
     isSettingConfigured,
     updateSettings,
   } = useUserSettings();
-  const router = useRouter();
   const singleFileRef = useRef<HTMLInputElement>(null);
   const singleCameraRef = useRef<HTMLInputElement>(null);
   const bulkFileRef = useRef<HTMLInputElement>(null);
@@ -82,8 +77,6 @@ export function PhotoScanTab() {
 
   const [scanMode, setScanMode] = useState<'single' | 'bulk'>('single');
   const [sessionCaptureTarget, setSessionCaptureTarget] = useState<PhotoCaptureTarget | null>(null);
-  const [pendingSaveOffer, setPendingSaveOffer] = useState<DefaultSaveOffer | null>(null);
-  const [pendingSaveTarget, setPendingSaveTarget] = useState<PhotoCaptureTarget | null>(null);
 
   const photoTargetConfigured = isSettingConfigured('photoCaptureTarget');
   const effectiveCaptureTarget = sessionCaptureTarget ?? photoCaptureTarget;
@@ -103,7 +96,6 @@ export function PhotoScanTab() {
   const activeBulkQueueRef = useRef<PendingPhoto[]>([]);
   const bulkRunIdRef = useRef(0);
   const singleRunIdRef = useRef(0);
-  const batchConditionPrefillRef = useRef<EbayCondition | null>(null);
   const currentPhotoFileRef = useRef<File | null>(null);
   pendingPhotosRef.current = pendingPhotos;
   bulkIndexRef.current = bulkIndex;
@@ -118,7 +110,6 @@ export function PhotoScanTab() {
   };
 
   const resetBulk = () => {
-    batchConditionPrefillRef.current = null;
     bulkRunIdRef.current += 1;
     revokePendingPhotos(pendingPhotos);
     revokePendingPhotos(activeBulkQueueRef.current);
@@ -138,14 +129,9 @@ export function PhotoScanTab() {
 
   const handleCaptureTargetChange = (target: PhotoCaptureTarget) => {
     setSessionCaptureTarget(target);
-
     if (!photoTargetConfigured) {
-      setPendingSaveTarget(target);
-      setPendingSaveOffer({
-        key: 'photoCaptureTarget',
-        label: settingLabel('photoCaptureTarget'),
-        description: describePhotoCaptureTarget(target),
-      });
+      updateSettings({ photoCaptureTarget: target });
+      toast.success(`Saved default: ${describePhotoCaptureTarget(target)}`);
     }
   };
 
@@ -155,19 +141,6 @@ export function PhotoScanTab() {
     return null;
   };
 
-  const handleSaveDefaultConfirm = () => {
-    if (pendingSaveTarget) {
-      updateSettings({ photoCaptureTarget: pendingSaveTarget });
-    }
-    setPendingSaveOffer(null);
-    setPendingSaveTarget(null);
-  };
-
-  const handleSaveDefaultDecline = () => {
-    setPendingSaveOffer(null);
-    setPendingSaveTarget(null);
-  };
-
   const captureHint =
     effectiveCaptureTarget === 'upc'
       ? 'Point at the UPC barcode — the black lines with numbers underneath.'
@@ -175,25 +148,13 @@ export function PhotoScanTab() {
         ? 'Point at the product label on the front — we will read the text for you to review.'
         : 'Choose what you are photographing above, then take a photo.';
 
-  const handleApplyConditionToRemaining = (condition: EbayCondition) => {
-    batchConditionPrefillRef.current = condition;
-  };
-
-  const applyBatchConditionPrefill = (data: ProductReviewData): ProductReviewData => {
-    const prefill = batchConditionPrefillRef.current;
-    if (!data.initialCondition && prefill) {
-      return { ...data, initialCondition: prefill };
-    }
-    return data;
-  };
-
   const queueItem = async (payload: ProductReviewConfirmPayload) => {
     let photoUrl = payload.photoUrl;
     let userImageUrl = payload.userImageUrl;
     let preferredImageSource = payload.preferredImageSource;
 
     try {
-      const persisted = await persistPhotoScanImage(photoUrl, currentPhotoFileRef.current ?? undefined);
+      const persisted = await persistPhotoScanImage(photoUrl ?? undefined, currentPhotoFileRef.current ?? undefined);
       if (persisted.photoUrl) photoUrl = persisted.photoUrl;
       if (persisted.userImageUrl) userImageUrl = persisted.userImageUrl;
       if (persisted.preferredImageSource) preferredImageSource = persisted.preferredImageSource;
@@ -201,22 +162,24 @@ export function PhotoScanTab() {
       // Local blob kept for in-app preview when upload is unavailable.
     }
 
-    addItem(payload.query, 'photo', {
+    void addItem(payload.query, 'photo', {
       photoUrl,
-      userImageUrl,
-      preferredImageSource,
+      userImageUrl: userImageUrl ?? null,
+      preferredImageSource: preferredImageSource ?? null,
       quantity: payload.quantity,
       condition: payload.condition,
       pricingMode: payload.pricingMode,
       percentBelow: payload.percentBelow,
-      manualPrice: payload.manualPrice,
-      marketPricePreference: payload.marketPricePreference,
+      price: payload.price,
+      pricingSource: payload.pricingSource ?? 'amazon',
       selectedMarketPriceSource: payload.selectedMarketPriceSource,
-      customTitle: payload.customTitle,
-      customDescription: payload.customDescription,
-      detectedProductType: payload.parseMeta?.packType,
-      detectedCardCount: payload.parseMeta?.cardCount,
-      status: statusFromProductMatch(!!payload.product),
+      customTitle: payload.customTitle ?? null,
+      customDescription: payload.customDescription ?? null,
+      imageUrl: payload.selectedImageUrls?.[0] ?? payload.selectedImageUrl ?? null,
+      imageUrls:
+        payload.selectedImageUrls ??
+        (payload.selectedImageUrl ? [payload.selectedImageUrl] : []),
+      lookupStatus: lookupStatusFromMatch(!!payload.product),
       product: payload.product,
     });
   };
@@ -234,9 +197,7 @@ export function PhotoScanTab() {
     currentPhotoFileRef.current = file;
 
     try {
-      const data = applyBatchConditionPrefill(
-        await buildPhotoReviewData(file, objectUrl, { captureTarget }),
-      );
+      const data = await buildPhotoReviewData(file, objectUrl, { captureTarget });
       if (runId !== singleRunIdRef.current) return;
       setReviewData(data);
     } finally {
@@ -280,15 +241,13 @@ export function PhotoScanTab() {
     const photo = photos[index]!;
     currentPhotoFileRef.current = photo.file;
     try {
-      const data = applyBatchConditionPrefill(
-        await buildPhotoReviewData(photo.file, photo.previewUrl, { captureTarget }),
-      );
+      const data = await buildPhotoReviewData(photo.file, photo.previewUrl, { captureTarget });
       if (runId !== bulkRunIdRef.current) return;
       setReviewData(data);
     } catch (err) {
       if (runId !== bulkRunIdRef.current) return;
       const message = err instanceof Error ? err.message : 'Photo scan failed.';
-      setReviewData(applyBatchConditionPrefill({
+      setReviewData({
         variant: 'photo',
         searchQuery: '',
         photoUrl: photo.previewUrl,
@@ -303,7 +262,7 @@ export function PhotoScanTab() {
         initialPercentBelow: 10,
         initialManualPrice: 0,
         source: 'photo',
-      }));
+      });
     } finally {
       if (runId === bulkRunIdRef.current) {
         setScanning(false);
@@ -315,7 +274,6 @@ export function PhotoScanTab() {
     if (!photos.length || bulkProcessingRef.current) return;
     if (!ensureCaptureTarget()) return;
 
-    batchConditionPrefillRef.current = null;
     activeBulkQueueRef.current = photos;
     bulkProcessingRef.current = true;
     setBulkProcessing(true);
@@ -347,15 +305,6 @@ export function PhotoScanTab() {
     }
 
     resetSingle();
-  };
-
-  const handleExitToReview = () => {
-    if (bulkProcessingRef.current) {
-      finishBulkQueue();
-    } else {
-      resetSingle();
-    }
-    router.push('/review');
   };
 
   const handleCancelBatch = () => {
@@ -419,6 +368,10 @@ export function PhotoScanTab() {
     if (!ensureCaptureTarget()) return;
     ref.current?.click();
   };
+
+  const photoBatchLabel = bulkProgress
+    ? `Photo ${bulkProgress.current} of ${bulkProgress.total}`
+    : undefined;
 
   const scanningMessage =
     effectiveCaptureTarget === 'upc' ? 'Reading barcode…' : 'Reading label…';
@@ -592,19 +545,7 @@ export function PhotoScanTab() {
           data={reviewData}
           onConfirm={handleConfirmReview}
           onClose={handleCloseReview}
-          onExitToReview={handleExitToReview}
-          onCancelBatch={handleCancelBatch}
-          queuedItemCount={items.length}
-          batchProgress={bulkProgress}
-          onApplyConditionToRemaining={handleApplyConditionToRemaining}
-        />
-      )}
-
-      {pendingSaveOffer && (
-        <SaveDefaultPrompt
-          offers={[pendingSaveOffer]}
-          onConfirm={handleSaveDefaultConfirm}
-          onDecline={handleSaveDefaultDecline}
+          batchLabel={photoBatchLabel}
         />
       )}
     </div>

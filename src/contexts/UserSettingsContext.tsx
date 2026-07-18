@@ -1,7 +1,7 @@
 'use client';
 
-import { createContext, useContext, useCallback, type ReactNode } from 'react';
-import { applyTextCase } from '../utils/textCase';
+import { createContext, useContext, useCallback, useEffect, useState, type ReactNode } from 'react';
+import { applyTextCase } from '../utils/settings';
 import {
   DEFAULT_USER_SETTINGS,
   isSettingConfigured,
@@ -11,16 +11,11 @@ import {
   type PhotoCaptureTarget,
   type UserSettingKey,
   type UserSettings,
-} from '../utils/userSettings';
+} from '../utils/settings';
 import { useAuth } from './AuthContext';
 import { useToast } from './ToastContext';
 import { fetchUserSettingsAction, saveUserSettingsAction } from '@/lib/settings/actions';
-import {
-  readUserScopedJson,
-  userScopedStorageKey,
-  writeUserScopedJson,
-} from '@/lib/persistence/userScopedStorage';
-import { useUserScopedPersistence } from '@/hooks/useUserScopedPersistence';
+import { getAccessToken } from '@/lib/supabase/client';
 
 interface UserSettingsContextType {
   settings: UserSettings;
@@ -36,36 +31,46 @@ const UserSettingsContext = createContext<UserSettingsContextType | null>(null);
 export function UserSettingsProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const toast = useToast();
+  const [settings, setSettings] = useState<UserSettings>(DEFAULT_USER_SETTINGS);
 
-  const onLoadError = useCallback((message: string) => {
-    toast.error(message);
+  useEffect(() => {
+    if (!user) {
+      setSettings(DEFAULT_USER_SETTINGS);
+      return;
+    }
+
+    let active = true;
+    void (async () => {
+      try {
+        const token = await getAccessToken();
+        if (!token || !active) return;
+        const remote = await fetchUserSettingsAction(token);
+        if (active) setSettings(loadUserSettings(remote));
+      } catch {
+        if (active) toast.error('Failed to load settings.');
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [user?.id, toast]);
+
+  const updateSettings = useCallback((patch: Partial<UserSettings>) => {
+    setSettings(prev => {
+      const next = loadUserSettings({ ...prev, ...patch });
+      void (async () => {
+        try {
+          const token = await getAccessToken();
+          if (!token) return;
+          await saveUserSettingsAction(token, next);
+        } catch {
+          toast.error('Failed to save settings.');
+        }
+      })();
+      return next;
+    });
   }, [toast]);
-
-  const onSaveError = useCallback((message: string) => {
-    toast.error(message);
-  }, [toast]);
-
-  const readLocalSettings = useCallback((userId: string) => {
-    const key = userScopedStorageKey('settings', userId);
-    const raw = readUserScopedJson<Partial<UserSettings>>(key, {});
-    return loadUserSettings(raw);
-  }, []);
-
-  const writeLocalSettings = useCallback((userId: string, settings: UserSettings) => {
-    writeUserScopedJson(userScopedStorageKey('settings', userId), settings);
-  }, []);
-
-  const { data: settings, update: updateSettings } = useUserScopedPersistence({
-    namespace: 'settings',
-    userId: user?.id,
-    defaultValue: DEFAULT_USER_SETTINGS,
-    loadRemote: fetchUserSettingsAction,
-    saveRemote: saveUserSettingsAction,
-    readLocal: readLocalSettings,
-    writeLocal: writeLocalSettings,
-    onLoadError,
-    onSaveError,
-  });
 
   const checkConfigured = (key: UserSettingKey) => isSettingConfigured(settings, key);
 

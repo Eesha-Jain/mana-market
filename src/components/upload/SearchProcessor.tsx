@@ -1,20 +1,19 @@
 'use client';
 
-/**
- * Background processor — resolves legacy idle items via the backend (UPC + eBay).
- * Upload and photo flows set status + product during entry review; this handles
- * any remaining idle rows (e.g. older data or programmatic addItem without overrides).
- */
 import { useEffect, useRef } from 'react';
-import { useItems } from '@/contexts/ItemsContext';
-import { ITEM_STATUS } from '@/types';
+import { useInventory } from '@/contexts/InventoryContext';
+import type { UserItemWithCatalog } from '@/types';
+import { LOOKUP_STATUS } from '@/types';
 import { useToast } from '@/contexts/ToastContext';
-import { searchProduct } from '@/utils/productApi';
-import { resolveSearchParams } from '@/utils/productLookup';
-import { findNextIdleItem } from '@/utils/itemStatus';
+import { searchProduct } from '@/utils/search';
+import { resolveSearchParams } from '@/utils/search';
+import { findNextIdleItem } from '@/utils/items';
+import { productToCatalogSnapshot } from '@/utils/items';
+import { getAccessToken } from '@/lib/supabase/client';
+import { upsertCatalogForUserItemAction } from '@/lib/inventory/actions';
 
 export function SearchProcessor() {
-  const { items, updateItem } = useItems();
+  const { items, updateItem } = useInventory();
   const toast = useToast();
   const busy = useRef(false);
   const lastUnavailableToastRef = useRef<string | null>(null);
@@ -24,22 +23,24 @@ export function SearchProcessor() {
     if (!idle || busy.current) return;
 
     busy.current = true;
-    updateItem(idle.id, { status: ITEM_STATUS.Searching });
+    updateItem(idle.id, { lookupStatus: LOOKUP_STATUS.Searching });
 
-    processItem(idle.id, idle.query, idle.originalUpc, idle.originalSku)
-      .finally(() => {
-        setTimeout(() => { busy.current = false; }, 150);
-      });
+    processItem(idle.id, idle.query, idle.originalUpc, idle.originalSku, idle.catalog).finally(() => {
+      setTimeout(() => {
+        busy.current = false;
+      }, 150);
+    });
 
     async function processItem(
       id: string,
       query: string,
-      originalUpc?: string,
-      originalSku?: string,
+      originalUpc?: string | null,
+      originalSku?: string | null,
+      existingCatalog?: UserItemWithCatalog['catalog'],
     ) {
       const { query: searchQuery, upc, sku } = resolveSearchParams(query, {
-        originalUpc,
-        originalSku,
+        originalUpc: originalUpc ?? undefined,
+        originalSku: originalSku ?? undefined,
       });
 
       const result = await searchProduct(searchQuery, upc, sku).catch(
@@ -47,17 +48,42 @@ export function SearchProcessor() {
       );
 
       if (result.type === 'found') {
-        updateItem(id, {
-          status: ITEM_STATUS.Found,
-          product: result.product,
-        });
+        const token = await getAccessToken();
+        if (token) {
+          try {
+            const saved = await upsertCatalogForUserItemAction(token, id, {
+              upc: result.product.upc ?? upc ?? null,
+              asin: result.product.asin ?? null,
+              title: result.product.title,
+              description: result.product.description,
+              catalogSnapshot: productToCatalogSnapshot(result.product),
+            });
+            updateItem(id, {
+              lookupStatus: LOOKUP_STATUS.Found,
+              catalog: saved.catalog,
+              itemId: saved.itemId,
+            });
+            return;
+          } catch {
+            // fall through to local update
+          }
+        }
+        updateItem(id, { lookupStatus: LOOKUP_STATUS.Found });
         return;
       }
 
       if (result.type === 'ambiguous') {
         updateItem(id, {
-          status: ITEM_STATUS.Ambiguous,
-          ambiguousResults: result.results,
+          lookupStatus: LOOKUP_STATUS.Ambiguous,
+          catalog: existingCatalog
+            ? {
+                ...existingCatalog,
+                catalogSnapshot: {
+                  ...existingCatalog.catalogSnapshot,
+                  ambiguousResults: result.results.map(productToCatalogSnapshot),
+                },
+              }
+            : null,
         });
         return;
       }
@@ -70,7 +96,7 @@ export function SearchProcessor() {
             toast.error(`Lookup failed for "${query}": ${reason}`);
           }
         }
-        updateItem(id, { status: ITEM_STATUS.NotFound });
+        updateItem(id, { lookupStatus: LOOKUP_STATUS.NotFound });
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps

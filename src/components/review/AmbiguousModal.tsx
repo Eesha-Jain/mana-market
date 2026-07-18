@@ -1,7 +1,7 @@
 'use client';
 
 import type { Product } from '@/types';
-import { formatPrice, getMarketPriceSourceLabel } from '@/utils/productApi';
+import { formatPrice, getMarketPriceSourceLabel } from '@/utils/search';
 import { Modal } from '@/components/ui/Modal';
 
 interface AmbiguousModalProps {

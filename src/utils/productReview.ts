@@ -28,7 +28,7 @@ export interface ProductReviewData {
   initialCondition: ReviewListingDefaults['condition'];
   initialPricingMode: ReviewListingDefaults['pricingMode'];
   initialPercentBelow: ReviewListingDefaults['percentBelow'];
-  initialManualPrice: ReviewListingDefaults['manualPrice'];
+  initialManualPrice: ReviewListingDefaults['price'];
   source: ItemSource;
 }
 
@@ -51,8 +51,14 @@ export function buildInitialDescription(
 export function getReviewHeroImage(
   data: ProductReviewData,
   product: Product | null,
-  selection?: { selectedUrl?: string | null; preferredImageSource?: PreferredImageSource; userImageUrl?: string },
+  selection?: {
+    selectedUrl?: string | null;
+    selectedUrls?: string[];
+    preferredImageSource?: PreferredImageSource;
+    userImageUrl?: string;
+  },
 ): string | null {
+  if (selection?.selectedUrls?.[0]) return selection.selectedUrls[0];
   if (selection?.selectedUrl) return selection.selectedUrl;
   if (selection?.preferredImageSource === 'user') {
     return selection.userImageUrl ?? data.photoUrl ?? null;
@@ -79,7 +85,7 @@ export function collectReviewImageCandidates(
     push(candidate.url, candidate.source);
   }
   for (const url of product?.imageUrls ?? []) {
-    push(url, 'ebay_sold');
+    push(url, 'amazon_catalog');
   }
   push(userImageUrl, 'user_upload');
   push(data.photoUrl, 'user_photo');

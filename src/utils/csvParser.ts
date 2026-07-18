@@ -156,7 +156,39 @@ export function buildHeaderToCanonicalMap(
   return headerToCanonical;
 }
 
-/** Warn when multiple columns map to the same canonical field (first column in file order wins). */
+/** Join values from multiple columns mapped to the same field (deduped, file order). */
+function combineMappedValues(key: CSVColumnKey, values: string[]): string {
+  const unique: string[] = [];
+  const seen = new Set<string>();
+
+  for (const value of values) {
+    const trimmed = value.trim();
+    if (!trimmed) continue;
+    const norm = trimmed.toLowerCase();
+    if (seen.has(norm)) continue;
+    seen.add(norm);
+    unique.push(trimmed);
+  }
+
+  if (unique.length === 0) return '';
+  if (unique.length === 1) return unique[0]!;
+
+  if (key === 'quantity') {
+    const nums = unique
+      .map(v => parseInt(v.replace(/,/g, ''), 10))
+      .filter(n => !Number.isNaN(n));
+    if (nums.length > 0) return String(nums.reduce((a, b) => a + b, 0));
+  }
+
+  if (key === 'price') {
+    return unique[0]!;
+  }
+
+  const sep = key === 'notes' ? '; ' : ' ';
+  return unique.join(sep);
+}
+
+/** Warn when multiple columns map to the same canonical field (values are combined). */
 export function getDuplicateMappingWarnings(
   parsed: RawParsedTable,
   userMappings: Record<string, ColumnMappingChoice>,
@@ -175,9 +207,14 @@ export function getDuplicateMappingWarnings(
   const warnings: string[] = [];
   for (const [canonical, headers] of canonicalToHeaders) {
     if (headers.length <= 1) continue;
+    const how =
+      canonical === 'quantity'
+        ? 'Quantities will be summed.'
+        : canonical === 'price'
+          ? `Only the first non-empty value ("${headers[0]}") will be used for price.`
+          : 'Their values will be combined.';
     warnings.push(
-      `Multiple columns map to ${CSV_COLUMN_LABELS[canonical]} (${headers.join(', ')}). ` +
-      `Only "${headers[0]}" will be used.`,
+      `Multiple columns map to ${CSV_COLUMN_LABELS[canonical]} (${headers.join(', ')}). ${how}`,
     );
   }
   return warnings;
@@ -189,18 +226,23 @@ export function applyColumnMappings(
   userMappings: Record<string, ColumnMappingChoice>,
 ): CSVRow[] {
   const headerToCanonical = buildHeaderToCanonicalMap(parsed, userMappings);
+  const valuesByCanonical = new Map<CSVColumnKey, string[]>();
+
+  for (const header of parsed.originalHeaders) {
+    const canonical = headerToCanonical.get(header);
+    if (!canonical) continue;
+    const list = valuesByCanonical.get(canonical) ?? [];
+    list.push(header);
+    valuesByCanonical.set(canonical, list);
+  }
 
   return parsed.rawRows.map(rawRow => {
     const row: CSVRow = {};
 
-    for (const header of parsed.originalHeaders) {
-      const canonical = headerToCanonical.get(header);
-      if (!canonical) continue;
-
-      const trimmed = (rawRow[header] ?? '').trim();
-      if (!trimmed || row[canonical]) continue;
-
-      row[canonical] = trimmed;
+    for (const [canonical, headers] of valuesByCanonical) {
+      const parts = headers.map(header => rawRow[header] ?? '');
+      const combined = combineMappedValues(canonical, parts);
+      if (combined) row[canonical] = combined;
     }
 
     return finalizeCSVRow(row);

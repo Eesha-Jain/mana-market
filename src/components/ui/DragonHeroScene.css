@@ -229,7 +229,7 @@
 
 .home-scroll-hint-arrow {
   font-size: 1.2rem;
-  color: var(--gold-dim);
+  color: var(--accent-dim);
 }
 
 /* Content appears at page top after fire */

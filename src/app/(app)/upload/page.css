@@ -139,10 +139,7 @@
   font-size: 0.9rem;
 }
 
-.csv-preview-table-wrapper {
-  overflow-x: auto;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+.csv-preview .items-table-wrapper {
   margin-bottom: 12px;
 }
 
@@ -184,10 +181,14 @@
 }
 
 .upload-queue {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 16px 20px;
+  margin-top: 8px;
+}
+
+.upload-queue-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .csv-input-area {

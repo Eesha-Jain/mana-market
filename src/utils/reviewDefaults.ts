@@ -9,7 +9,7 @@ import {
   settingLabel,
   type UserSettingKey,
   type UserSettings,
-} from './userSettings';
+} from './settings';
 
 export interface DefaultSaveOffer {
   key: UserSettingKey;

@@ -7,7 +7,6 @@ import type {
   PricingMode,
   Product,
   MarketPricePreference,
-  MarketPriceSource,
 } from '@/types';
 import { Modal } from '@/components/ui/Modal';
 import { LabeledFieldWithCase } from '@/components/ui/CaseFormatToolbar';
@@ -78,9 +77,9 @@ export interface ItemModalShellProps {
 
   product: Product | null | undefined;
   marketPricePreference: MarketPricePreference;
-  selectedMarketPriceSource?: MarketPriceSource;
+  selectedMarketPriceSource?: string;
   onMarketPricePreferenceChange: (preference: MarketPricePreference) => void;
-  onSelectedMarketPriceSourceChange: (source: MarketPriceSource | undefined) => void;
+  onSelectedMarketPriceSourceChange: (source: string | undefined) => void;
 
   marketPrice: number | null;
   pricingMode: PricingMode;

@@ -5,7 +5,7 @@ import {
   CSV_COLUMN_LABELS,
   type ColumnMappingChoice,
   type CSVColumnKey,
-} from '@/utils/csvParser';
+} from '@/utils/csv';
 
 interface CsvColumnMapperProps {
   unrecognizedHeaders: string[];

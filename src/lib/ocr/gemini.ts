@@ -7,7 +7,7 @@ import {
   OCR_PASS2_FOLLOWUP_PROMPT,
   UPC_OCR_PROMPT,
   mergeOcrPasses,
-} from '@/utils/ocrPrompts';
+} from '@/utils/ocr';
 
 const defaultModel = 'gemini-2.5-flash';
 const PASS1_MAX_OUTPUT_TOKENS = 1024;

@@ -1,31 +1,35 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import type { Product, EbayCondition } from '@/types';
+import type { ItemCondition, Product } from '@/types';
 import { toastReviewMessage, useToast } from '@/contexts/ToastContext';
-import { BatchProgressBanner } from './BatchProgressBanner';
-import { BatchExitActions } from './BatchExitActions';
-import { AmbiguousModal } from './AmbiguousModal';
-import { ItemModal } from '@/components/listings/ItemModal';
+import { BatchProgressBanner } from '@/components/review/BatchProgressBanner';
+import { BatchExitActions } from '@/components/review/BatchExitActions';
+import { AmbiguousModal } from '@/components/review/AmbiguousModal';
+import { ItemModalReview } from '@/components/listings/ItemModalReview';
 import { Modal } from '@/components/ui/Modal';
 import {
   needsProductDisambiguation,
   withSelectedProduct,
   type ProductReviewConfirmPayload,
   type ProductReviewData,
-} from '@/utils/productReview';
+} from '@/utils/review';
 
 interface ProductReviewFlowProps {
   data: ProductReviewData | null;
   loading?: boolean;
   loadingMessage?: string;
-  onConfirm: (payload: ProductReviewConfirmPayload) => void;
+  onConfirm: (payload: ProductReviewConfirmPayload, leaveAsDraft?: boolean) => void;
+  /** X / overlay — exit the whole batch (or cancel a single review). */
   onClose: () => void;
+  /** Skip only the current entry and continue the batch. Defaults to onClose. */
+  onSkip?: () => void;
   onExitToReview?: () => void;
   onCancelBatch?: () => void;
   queuedItemCount?: number;
   batchProgress?: { current: number; total: number; remaining?: number };
-  onApplyConditionToRemaining?: (condition: EbayCondition) => void;
+  onApplyConditionToRemaining?: (condition: ItemCondition) => void;
+  batchLabel?: string;
 }
 
 export function ProductReviewFlow({
@@ -34,12 +38,15 @@ export function ProductReviewFlow({
   loadingMessage = 'Looking up product…',
   onConfirm,
   onClose,
+  onSkip,
   onExitToReview,
   onCancelBatch,
   queuedItemCount = 0,
   batchProgress,
   onApplyConditionToRemaining,
+  batchLabel,
 }: ProductReviewFlowProps) {
+  const skipOrClose = onSkip ?? onClose;
   const [resolvedData, setResolvedData] = useState<ProductReviewData | null>(null);
   const [showDisambiguation, setShowDisambiguation] = useState(false);
   const toast = useToast();
@@ -61,8 +68,8 @@ export function ProductReviewFlow({
   }, [activeData?.scanError, activeData?.lookupError, toast]);
 
   const showExitToReview = queuedItemCount > 0 && onExitToReview;
-  const showCancelSingle = !batchProgress && onCancelBatch;
-  const showLoadingExit = showExitToReview || showCancelSingle;
+  const showCancelBatch = Boolean(onCancelBatch);
+  const showLoadingExit = showExitToReview || showCancelBatch;
   const batchItemLabel = data?.variant === 'photo' ? 'Photo' : 'Entry';
   const batchBanner = batchProgress && batchProgress.total > 1 ? (
     <BatchProgressBanner
@@ -92,15 +99,21 @@ export function ProductReviewFlow({
         >
           <div className="spinner" />
           <p>{loadingMessage}</p>
+          {batchLabel && <p className="text-muted-sm">{batchLabel}</p>}
           {showLoadingExit && (
             <BatchExitActions
               className="product-review-exit-actions"
               queuedItemCount={queuedItemCount}
               onExitToReview={showExitToReview ? onExitToReview : undefined}
-              onCancel={showCancelSingle ? onCancelBatch : undefined}
-              cancelLabel="Cancel"
+              onCancel={showCancelBatch ? onCancelBatch : undefined}
+              cancelLabel={batchProgress ? 'Save remaining & close' : 'Cancel'}
               cancelVariant="ghost"
             />
+          )}
+          {!showLoadingExit && (
+            <button type="button" className="btn-ghost btn-sm" onClick={onClose}>
+              Cancel
+            </button>
           )}
         </Modal>
       </>
@@ -117,19 +130,20 @@ export function ProductReviewFlow({
       <>
         {batchBanner}
         <AmbiguousModal
-        query={activeData.searchQuery}
-        results={ambiguousResults}
-        onSelect={(product: Product) => {
-          setResolvedData(withSelectedProduct(activeData, product));
-          setShowDisambiguation(false);
-        }}
-        onClose={() => {
-          if (needsProductDisambiguation(activeData)) {
-            onClose();
-            return;
-          }
-          setShowDisambiguation(false);
-        }}
+          query={activeData.searchQuery}
+          results={ambiguousResults}
+          onSelect={(product: Product) => {
+            setResolvedData(withSelectedProduct(activeData, product));
+            setShowDisambiguation(false);
+          }}
+          onClose={() => {
+            if (needsProductDisambiguation(activeData)) {
+              // Closing while a match is required exits the batch (or cancels single).
+              onClose();
+              return;
+            }
+            setShowDisambiguation(false);
+          }}
         />
       </>
     );
@@ -140,24 +154,24 @@ export function ProductReviewFlow({
   return (
     <>
       {batchBanner}
-      <ItemModal
-      mode="review"
-      key={`${activeData.variant}-${activeData.searchQuery}-${matchedProduct?.title ?? 'manual'}`}
-      data={activeData}
-      matchedProduct={matchedProduct}
-      allAmbiguousResults={ambiguousResults}
-      onRequestDisambiguation={
-        ambiguousResults?.length
-          ? () => setShowDisambiguation(true)
-          : undefined
-      }
-      onConfirm={onConfirm}
-      onClose={onClose}
-      onExitToReview={onExitToReview}
-      queuedItemCount={queuedItemCount}
-      batchProgress={batchProgress}
-      onApplyConditionToRemaining={onApplyConditionToRemaining}
-    />
+      <ItemModalReview
+        key={`${activeData.variant}-${activeData.searchQuery}-${matchedProduct?.title ?? 'manual'}`}
+        data={activeData}
+        matchedProduct={matchedProduct}
+        allAmbiguousResults={ambiguousResults}
+        onRequestDisambiguation={
+          ambiguousResults?.length
+            ? () => setShowDisambiguation(true)
+            : undefined
+        }
+        onConfirm={onConfirm}
+        onClose={onClose}
+        onSkip={batchProgress ? skipOrClose : undefined}
+        onExitToReview={onExitToReview}
+        queuedItemCount={queuedItemCount}
+        batchProgress={batchProgress}
+        onApplyConditionToRemaining={onApplyConditionToRemaining}
+      />
     </>
   );
 }

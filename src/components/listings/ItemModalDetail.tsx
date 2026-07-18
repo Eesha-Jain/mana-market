@@ -19,7 +19,7 @@ import {
   getEbayListingUrl,
   getItemMarketPrice,
 } from '@/utils/ebayMapper';
-import { resolveItemMarketSelection } from '@/utils/marketPrice';
+import { resolveItemMarketSelection, getAmazonProductUrl, getUpcCatalogUrl } from '@/utils/marketPrice';
 import { getItemStatusLabel, isItemAmbiguous } from '@/utils/itemStatus';
 import {
   isItemListingLocked,
@@ -80,16 +80,16 @@ export function ItemModalDetail({
   );
 
   const [imageSelection, setImageSelection] = useState<ProductImageSelection>(() => ({
-    selectedUrl: img,
-    userImageUrl: item.userImageUrl,
+    selectedUrls: img ? [img] : [],
+    userImageUrl: item.userImageUrl ?? undefined,
     preferredImageSource: item.preferredImageSource ?? (item.userImageUrl ? 'user' : 'catalog'),
   }));
 
   useEffect(() => {
     const nextImg = getItemImageUrl(item);
     setImageSelection({
-      selectedUrl: nextImg,
-      userImageUrl: item.userImageUrl,
+      selectedUrls: nextImg ? [nextImg] : [],
+      userImageUrl: item.userImageUrl ?? undefined,
       preferredImageSource: item.preferredImageSource ?? (item.userImageUrl ? 'user' : 'catalog'),
     });
   }, [item.id, item.userImageUrl, item.preferredImageSource, item.product?.imageUrls]);
@@ -101,14 +101,16 @@ export function ItemModalDetail({
     const updates: Partial<ItemListing> = {
       userImageUrl: selection.userImageUrl,
       preferredImageSource: selection.preferredImageSource,
+      imageUrl: selection.selectedUrls[0] ?? null,
+      imageUrls: selection.selectedUrls,
     };
 
-    if (product && selection.selectedUrl) {
+    if (product && selection.selectedUrls.length > 0) {
       updates.product = {
         ...product,
         imageUrls: [
-          selection.selectedUrl,
-          ...product.imageUrls.filter(url => url !== selection.selectedUrl),
+          ...selection.selectedUrls,
+          ...product.imageUrls.filter(url => !selection.selectedUrls.includes(url)),
         ],
       };
     }
@@ -160,6 +162,8 @@ export function ItemModalDetail({
             </div>
           )}
           <ProductExternalLinks
+            amazonUrl={getAmazonProductUrl(product)}
+            upcUrl={getUpcCatalogUrl(product)}
             ebaySearchUrl={product.ebaySearchUrl}
             tcgplayerUrl={product.tcgplayerUrl}
             className="product-external-links product-external-links--detail"

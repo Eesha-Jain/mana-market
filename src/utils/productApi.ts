@@ -50,34 +50,52 @@ export function formatPrice(price: number | null): string {
 }
 
 export function getMarketPriceSourceLabel(
-  source?: MarketPriceSource,
+  source?: MarketPriceSource | string,
   variant: 'full' | 'short' = 'full',
 ): string {
   if (variant === 'short') {
     switch (source) {
+      case 'amazon_retail':
+        return 'Amazon';
       case 'ebay_completed':
         return 'eBay sold avg';
       case 'upc_offers':
-        return 'Merchant offers';
+        return 'UPC catalog';
+      case 'upc_store':
+        return 'UPC store';
       case 'upc_recorded':
-        return 'Recorded price';
+        return 'UPC recorded';
+      case 'tcgplayer_market':
+        return 'TCGPlayer';
       case 'manual':
         return 'Manual';
       default:
+        if (typeof source === 'string' && source.startsWith('upc_store:')) {
+          return source.slice('upc_store:'.length) || 'UPC store';
+        }
         return 'Online lookup';
     }
   }
 
   switch (source) {
+    case 'amazon_retail':
+      return 'Amazon retail price';
     case 'ebay_completed':
       return 'Based on eBay sold listings';
     case 'upc_offers':
       return 'Based on merchant offers (UPC database)';
+    case 'upc_store':
+      return 'Based on a UPC shopping-info store offer';
     case 'upc_recorded':
       return 'Based on recorded catalog price (UPC database)';
+    case 'tcgplayer_market':
+      return 'TCGPlayer market price';
     case 'manual':
       return 'Manual estimate';
     default:
+      if (typeof source === 'string' && source.startsWith('upc_store:')) {
+        return `UPC store offer (${source.slice('upc_store:'.length)})`;
+      }
       return 'From online product lookup';
   }
 }

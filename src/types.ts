@@ -1,5 +1,6 @@
-// eBay listing conditions (with their eBay condition IDs)
-export type EbayCondition =
+// ── Conditions ───────────────────────────────────────────────────────────────
+
+export type ItemCondition =
   | 'New'
   | 'Like New'
   | 'Very Good'
@@ -7,26 +8,71 @@ export type EbayCondition =
   | 'Acceptable'
   | 'For Parts or Not Working';
 
-export interface EbayConditionInfo {
-  id: number;
-  label: EbayCondition;
+export interface ConditionInfo {
+  id: string;
+  label: ItemCondition;
   description: string;
-  mtgEquivalent: string;
 }
 
-export const EBAY_CONDITIONS: EbayConditionInfo[] = [
-  { id: 1000, label: 'New',                     description: 'Brand new, sealed or never played', mtgEquivalent: 'Mint (M)' },
-  { id: 2750, label: 'Like New',                description: 'Near perfect, no visible wear',     mtgEquivalent: 'Near Mint (NM)' },
-  { id: 4000, label: 'Very Good',               description: 'Minor signs of use, fully playable', mtgEquivalent: 'Lightly Played (LP)' },
-  { id: 5000, label: 'Good',                    description: 'Moderate wear, still fully playable', mtgEquivalent: 'Moderately Played (MP)' },
-  { id: 6000, label: 'Acceptable',              description: 'Heavy wear, functional for play',    mtgEquivalent: 'Heavily Played (HP)' },
-  { id: 7000, label: 'For Parts or Not Working', description: 'Damaged / not tournament legal',    mtgEquivalent: 'Damaged (DMG)' },
+export const ITEM_CONDITIONS: ConditionInfo[] = [
+  { id: 'new', label: 'New', description: 'Brand new, sealed or never used' },
+  { id: 'like_new', label: 'Like New', description: 'Near perfect, no visible wear' },
+  { id: 'very_good', label: 'Very Good', description: 'Minor signs of use' },
+  { id: 'good', label: 'Good', description: 'Moderate wear, fully functional' },
+  { id: 'acceptable', label: 'Acceptable', description: 'Heavy wear, still functional' },
+  { id: 'for_parts', label: 'For Parts or Not Working', description: 'Damaged or not working' },
 ];
+
+// ── Pricing ──────────────────────────────────────────────────────────────────
 
 export type PricingMode = 'market' | 'percent_below' | 'manual';
 
-/** Listing lookup lifecycle — mirrors public.item_status in Supabase. */
-export const ITEM_STATUS = {
+export type PricingSource = 'amazon' | 'upc' | 'ebay' | 'tcgplayer' | 'manual';
+
+export type MarketPricePreference = 'amazon' | 'upc' | 'show_all';
+
+export type MarketPriceSource =
+  | 'amazon_retail'
+  | 'upc_offers'
+  | 'upc_store'
+  | 'upc_recorded'
+  | 'ebay_completed'
+  | 'tcgplayer_market'
+  | 'manual';
+
+export interface MarketPriceOption {
+  /** Stable id for selection (e.g. amazon_retail, upc_store:ebay.com). Defaults to source. */
+  id?: string;
+  source: MarketPriceSource;
+  price: number;
+  priceRange?: PriceRange;
+  soldCount?: number;
+  /** Display name, e.g. "eBay.com" or "Walmart Marketplace". */
+  label?: string;
+  /** Deep link to the merchant listing / catalog page. */
+  url?: string;
+  /** ISO timestamp when the offer was last updated, if known. */
+  updatedAt?: string;
+}
+
+export interface PriceRange {
+  low: number;
+  high: number;
+}
+
+// ── Workflow & lookup ────────────────────────────────────────────────────────
+
+export const WORKFLOW_STATUS = {
+  Draft: 'draft',
+  Reviewed: 'reviewed',
+  Ready: 'ready',
+  Listed: 'listed',
+  Sold: 'sold',
+} as const;
+
+export type WorkflowStatus = (typeof WORKFLOW_STATUS)[keyof typeof WORKFLOW_STATUS];
+
+export const LOOKUP_STATUS = {
   Idle: 'idle',
   Searching: 'searching',
   Found: 'found',
@@ -34,63 +80,145 @@ export const ITEM_STATUS = {
   NotFound: 'not_found',
 } as const;
 
-export type ItemStatus = typeof ITEM_STATUS[keyof typeof ITEM_STATUS];
+export type LookupStatus = (typeof LOOKUP_STATUS)[keyof typeof LOOKUP_STATUS];
 
-export type MarketPriceSource =
-  | 'ebay_completed'
-  | 'upc_offers'
-  | 'upc_recorded'
-  | 'manual';
+/** @deprecated Use LOOKUP_STATUS — kept for transitional imports */
+export const ITEM_STATUS = LOOKUP_STATUS;
+/** @deprecated Use LookupStatus */
+export type ItemStatus = LookupStatus;
 
-/** How to choose market price when both eBay and UPC data exist. */
-export type MarketPricePreference = 'ebay' | 'upc' | 'show_all';
+// ── Images ───────────────────────────────────────────────────────────────────
 
-export interface MarketPriceOption {
-  source: MarketPriceSource;
-  price: number;
-  priceRange?: PriceRange;
-  soldCount?: number;
-}
+export type ImageCandidateSource =
+  | 'amazon_catalog'
+  | 'upc_catalog'
+  | 'user_upload'
+  | 'user_photo';
 
-export interface PriceRange { low: number; high: number; }
-
-export type ImageCandidateSource = 'upc_catalog' | 'ebay_sold' | 'user_upload' | 'user_photo';
-
-/** Which hero image to show when both catalog and user uploads exist. */
 export type PreferredImageSource = 'catalog' | 'user';
-
-/** How the listing entered the app. */
-export type ItemSource = 'manual' | 'csv' | 'photo';
-
-export const EBAY_LISTING_STATUS = {
-  Exported: 'exported',
-  Active: 'active',
-  Sold: 'sold',
-  Ended: 'ended',
-} as const;
-
-export type EbayListingStatus = typeof EBAY_LISTING_STATUS[keyof typeof EBAY_LISTING_STATUS];
 
 export interface ImageCandidate {
   url: string;
   source: ImageCandidateSource;
 }
 
-/** Resolved pricing fields used by calculateDraftPrice. */
-export interface PricingCalculationInput {
+// ── Catalog (communal items table) ───────────────────────────────────────────
+
+export interface CatalogSnapshot {
+  imageUrls?: string[];
+  imageCandidates?: ImageCandidate[];
+  amazonPrice?: number;
+  upcPrice?: number;
+  priceRange?: PriceRange;
+  brand?: string;
+  ambiguousResults?: CatalogSnapshot[];
+  marketPriceOptions?: MarketPriceOption[];
+}
+
+export interface CatalogItem {
+  id: string;
+  upc: string | null;
+  asin: string | null;
+  title: string;
+  description: string;
+  defaultCategory: string | null;
+  catalogSnapshot: CatalogSnapshot;
+  lastFetchedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ── Marketplaces ─────────────────────────────────────────────────────────────
+
+export type MarketplacePlatform = 'ebay' | 'tcgplayer' | 'facebook';
+
+export const MARKETPLACE_PLATFORMS: MarketplacePlatform[] = [
+  'ebay',
+  'tcgplayer',
+  'facebook',
+];
+
+export const MARKETPLACE_LABELS: Record<MarketplacePlatform, string> = {
+  ebay: 'eBay',
+  tcgplayer: 'TCGPlayer',
+  facebook: 'Facebook Marketplace',
+};
+
+export type MarketplaceListingStatus =
+  | 'pending'
+  | 'active'
+  | 'sold'
+  | 'ended'
+  | 'error';
+
+export interface MarketplaceListing {
+  listingId?: string;
+  url?: string;
+  status: MarketplaceListingStatus;
+  listedAt?: string;
+  lastSyncedAt?: string;
+  errorMessage?: string;
+}
+
+export type MarketplaceListings = Partial<Record<MarketplacePlatform, MarketplaceListing>>;
+
+export interface MarketplaceConnection {
+  id: string;
+  userId: string;
+  platform: MarketplacePlatform;
+  connectedAt: string;
+  expiresAt: string | null;
+  accountLabel: string | null;
+  isHealthy: boolean;
+  metadata: Record<string, unknown>;
+}
+
+// ── User inventory (user_items table) ────────────────────────────────────────
+
+export type ItemSource = 'manual' | 'csv' | 'photo';
+
+export interface UserItem {
+  id: string;
+  userId: string;
+  itemId: string | null;
+  referenceId: string;
+  query: string;
+  customTitle: string | null;
+  customDescription: string | null;
+  quantity: number;
+  condition: ItemCondition | null;
+  price: number;
+  /** @deprecated Derived cover image — prefer `imageUrls[0]`. Kept for UI helpers. */
+  imageUrl: string | null;
+  /** Ordered listing images selected by the user; first is the cover. */
+  imageUrls: string[];
+  category: string | null;
+  workflowStatus: WorkflowStatus;
+  lookupStatus: LookupStatus;
   pricingMode: PricingMode;
   percentBelow: number;
-  manualPrice: number;
+  pricingSource: PricingSource;
+  selectedMarketPriceSource: string | null;
+  marketplaceListings: MarketplaceListings;
+  targetPlatforms: MarketplacePlatform[];
+  originalUpc: string | null;
+  originalSku: string | null;
+  userImageUrl: string | null;
+  photoUrl: string | null;
+  preferredImageSource: PreferredImageSource | null;
+  notes: string;
+  source: ItemSource;
+  createdAt: string;
+  updatedAt: string;
 }
 
-/** Partial pricing from import before user defaults are applied. */
-export interface DefaultPricingDraft {
-  manualPrice: number;
-  pricingMode?: PricingMode;
-  percentBelow?: number;
+/** User item joined with communal catalog data for display. */
+export interface UserItemWithCatalog extends UserItem {
+  catalog: CatalogItem | null;
 }
 
-/** MTG product resolved via UPC lookup and/or eBay market data. */
+// ── Product enrichment (transient API response) ────────────────────────────
+
 export interface Product {
   title: string;
   description: string;
@@ -98,82 +226,39 @@ export interface Product {
   imageCandidates?: ImageCandidate[];
   brand?: string;
   upc?: string;
+  asin?: string;
   marketPrice?: number;
   marketPriceSource?: MarketPriceSource;
-  /** All discovered market prices (eBay sold avg, UPC catalog, etc.). */
   marketPriceOptions?: MarketPriceOption[];
   priceRange?: PriceRange;
-  soldCount?: number;
+  amazonSearchUrl?: string;
+  /** @deprecated Marketplace URLs from connected accounts */
   ebaySearchUrl?: string;
   tcgplayerUrl?: string;
+  soldCount?: number;
 }
 
-export interface ItemListing {
-  id: string;
-  /** Short human-readable ID for reference in exports and inventory (e.g. MTG-X7K2P9). */
-  listingId: string;
-  query: string;
-  status: ItemStatus;
+// ── Create / review payloads ─────────────────────────────────────────────────
 
-  // Original identifiers from import (preserved even when name is used for search)
-  originalUpc?: string;
-  originalSku?: string;
-
-  // Resolved product from UPC/eBay lookup
-  product?: Product;
-  ambiguousResults?: Product[];
-
-  /** User-edited listing title; overrides product.title when set. */
-  customTitle?: string;
-
-  /** User-edited listing description body; overrides product.description when set. */
-  customDescription?: string;
-
-  // ── User-set listing fields ──
-  quantity: number;
-  condition: EbayCondition | null;
+export interface PricingCalculationInput {
   pricingMode: PricingMode;
   percentBelow: number;
   manualPrice: number;
-  /** Which price source to use for market / % below pricing. */
-  marketPricePreference?: MarketPricePreference;
-  /** When preference is show_all, the source the user picked for this listing. */
-  selectedMarketPriceSource?: MarketPriceSource;
-  notes: string;
-
-  // ── eBay tracking ──
-  ebayExportedAt?: string;
-  /** Marked live on eBay without exporting through this app. */
-  listedExternally?: boolean;
-  ebayListingStatus?: EbayListingStatus;
-  /** Live eBay listing URL (paste after listing goes active). */
-  ebayListingUrl?: string;
-
-  // ── Photo scan metadata ──
-  photoUrl?: string;
-  /** User-uploaded image URL (Supabase Storage public URL). */
-  userImageUrl?: string;
-  /** Which image to show on listings and export. */
-  preferredImageSource?: PreferredImageSource;
-  /** Product format detected from label OCR (e.g. Foil Promo Pack, Commander Deck). */
-  detectedProductType?: string;
-  /** Card count detected from label OCR (e.g. "3 Cards"). */
-  detectedCardCount?: string;
-
-  // ── Meta ──
-  source: ItemSource;
-  createdAt: string;
 }
 
-/** Initial listing fields shown in review dialogs before save. */
+export interface DefaultPricingDraft {
+  manualPrice: number;
+  pricingMode?: PricingMode;
+  percentBelow?: number;
+}
+
 export type ReviewListingDefaults = Pick<
-  ItemListing,
-  'quantity' | 'condition' | 'pricingMode' | 'percentBelow' | 'manualPrice'
+  UserItem,
+  'quantity' | 'condition' | 'pricingMode' | 'percentBelow' | 'price'
 >;
 
-/** Fields collected when confirming a review flow — derived from ItemListing. */
 export type ListingCreatePayload = Pick<
-  ItemListing,
+  UserItem,
   | 'query'
   | 'source'
   | 'customTitle'
@@ -184,15 +269,22 @@ export type ListingCreatePayload = Pick<
   | 'condition'
   | 'pricingMode'
   | 'percentBelow'
-  | 'manualPrice'
-  | 'marketPricePreference'
+  | 'price'
+  | 'pricingSource'
   | 'selectedMarketPriceSource'
-  | 'product'
-  | 'photoUrl'
+  | 'category'
   | 'userImageUrl'
+  | 'photoUrl'
   | 'preferredImageSource'
+  | 'notes'
 > & {
+  itemId?: string | null;
+  /** @deprecated Prefer selectedImageUrls */
   selectedImageUrl?: string;
+  /** Ordered selected listing images; first is the cover. */
+  selectedImageUrls?: string[];
+  catalogSnapshot?: CatalogSnapshot;
+  product?: Product;
   parseMeta?: {
     packType?: string;
     cardCount?: string;
@@ -209,7 +301,31 @@ export interface CSVRow {
   condition?: string;
   notes?: string;
   price?: string;
+  category?: string;
 }
+
+// ── Legacy aliases for gradual migration ─────────────────────────────────────
+
+/** @deprecated Use UserItem */
+export type ItemListing = UserItemWithCatalog;
+
+export type EbayCondition = ItemCondition;
+
+export const EBAY_CONDITIONS = ITEM_CONDITIONS.map(c => ({
+  id: 0,
+  label: c.label,
+  description: c.description,
+  mtgEquivalent: c.label,
+}));
+
+export const EBAY_LISTING_STATUS = {
+  Exported: 'exported',
+  Active: 'active',
+  Sold: 'sold',
+  Ended: 'ended',
+} as const;
+
+export type EbayListingStatus = (typeof EBAY_LISTING_STATUS)[keyof typeof EBAY_LISTING_STATUS];
 
 export interface EbayListingPayload {
   title: string;
@@ -223,18 +339,5 @@ export interface EbayListingPayload {
   itemSpecifics: Record<string, string>;
   listingType: 'FixedPriceItem';
   listingDuration: 'GTC';
-  /** Cross-reference SKU included in export JSON — matches listingId. */
   sku?: string;
 }
-
-export {
-  generateListingId,
-  getDetectedTitle,
-  getItemTitle,
-  hasCustomTitle,
-  getItemImageUrl,
-  getItemPictureUrls,
-  itemHasListingImage,
-  getItemListingDescription,
-  patchItemListingDescription,
-} from './utils/itemListing';

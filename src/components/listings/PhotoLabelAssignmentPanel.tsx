@@ -1,7 +1,7 @@
 'use client';
 
-import type { OcrLineAssignment, OcrLineTarget } from '@/utils/photoScanner';
-import type { ProductReviewData } from '@/utils/productReview';
+import type { OcrLineAssignment, OcrLineTarget } from '@/utils/ocr';
+import type { ProductReviewData } from '@/utils/review';
 
 interface PhotoLabelAssignmentPanelProps {
   data: ProductReviewData;
