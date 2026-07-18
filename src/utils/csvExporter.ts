@@ -1,12 +1,12 @@
-import type { ItemListing } from '../types';
+import type { UserItemWithCatalog } from '../types';
 import { calculatePrice, getItemMarketPrice } from './ebayMapper';
-import { getItemTitle, getItemListingDescription, getItemImageUrl } from '../types';
+import { getItemTitle, getItemListingDescription, getItemImageUrl, getItemProduct } from './items';
 
 export interface CsvColumnDef {
   id: string;
   label: string;
   defaultHeader: string;
-  getValue: (item: ItemListing) => string;
+  getValue: (item: UserItemWithCatalog) => string;
 }
 
 export const CSV_COLUMNS: CsvColumnDef[] = [
@@ -14,7 +14,7 @@ export const CSV_COLUMNS: CsvColumnDef[] = [
     id: 'listing_id',
     label: 'Listing ID',
     defaultHeader: 'Listing ID',
-    getValue: item => item.listingId,
+    getValue: item => item.referenceId,
   },
   {
     id: 'name',
@@ -26,13 +26,13 @@ export const CSV_COLUMNS: CsvColumnDef[] = [
     id: 'brand',
     label: 'Brand',
     defaultHeader: 'Brand',
-    getValue: item => item.product?.brand ?? '',
+    getValue: item => getItemProduct(item)?.brand ?? '',
   },
   {
     id: 'upc',
     label: 'UPC',
     defaultHeader: 'UPC',
-    getValue: item => item.product?.upc ?? item.originalUpc ?? '',
+    getValue: item => getItemProduct(item)?.upc ?? item.originalUpc ?? '',
   },
   {
     id: 'sku',
@@ -80,7 +80,7 @@ export const CSV_COLUMNS: CsvColumnDef[] = [
     id: 'description',
     label: 'Description',
     defaultHeader: 'Description',
-    getValue: item => getItemListingDescription(item) || item.product?.description || '',
+    getValue: item => getItemListingDescription(item) || getItemProduct(item)?.description || '',
   },
   {
     id: 'image_url',
@@ -92,13 +92,13 @@ export const CSV_COLUMNS: CsvColumnDef[] = [
     id: 'ebay_url',
     label: 'eBay Search URL',
     defaultHeader: 'eBay URL',
-    getValue: item => item.product?.ebaySearchUrl ?? '',
+    getValue: item => getItemProduct(item)?.ebaySearchUrl ?? '',
   },
   {
     id: 'tcgplayer_url',
     label: 'TCGplayer URL',
     defaultHeader: 'TCGplayer URL',
-    getValue: item => item.product?.tcgplayerUrl ?? '',
+    getValue: item => getItemProduct(item)?.tcgplayerUrl ?? '',
   },
 ];
 
@@ -112,7 +112,7 @@ function escapeCsvField(value: string): string {
   return value;
 }
 
-export function buildCsvContent(items: ItemListing[], config: CsvExportConfig): string {
+export function buildCsvContent(items: UserItemWithCatalog[], config: CsvExportConfig): string {
   const columns = config.columnIds
     .map(id => CSV_COLUMNS.find(c => c.id === id))
     .filter((c): c is CsvColumnDef => !!c);
